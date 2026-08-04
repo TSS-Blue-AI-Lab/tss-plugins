@@ -6,7 +6,7 @@ import { hasExplicitOnlyPolicy } from './preflight-policy.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'plugins', 'secaudit')
 
-// The gate predicate is shared with scripts/preflight.mjs (one rule, three call sites), so it is
+// The gate predicate is shared with ./preflight-policy.mjs (one rule, two call sites), so it is
 // tested here directly against synthetic YAML first — asserting the shipped files with the same
 // function that defines "correct" would otherwise be tautological.
 assert.ok(

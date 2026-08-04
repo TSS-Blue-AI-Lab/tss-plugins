@@ -6,9 +6,9 @@ folders.
 
 ## Plugins
 
-| Plugin | Version | Description |
-|---|---|---|
-| [secaudit](plugins/secaudit/) | 0.1.0 | Agentic source-code security audit: Recon → Hunt → Challenge → Dedupe → Trace → report generation. Deterministic Node runtime, never mutates the target repo. |
+| Plugin | Description |
+|---|---|
+| [secaudit](plugins/secaudit/) | Agentic source-code security audit: Recon → Hunt → Challenge → Dedupe → Trace → report generation. Deterministic Node runtime, never mutates the target repo. |
 
 ## Install
 
@@ -31,14 +31,6 @@ Then open `/plugins` and install `secaudit`.
 
 Add the marketplace via the Codex CLI command above, restart the app, then pick
 `tss-plugins` as the source in the Plugins Directory and install from there.
-
-### Other agents (Cursor, Copilot, Gemini CLI, OpenCode, …)
-
-Via [skills.sh](https://skills.sh), pointing at the plugin's skill tree:
-
-```
-npx skills add AI-Lab-Yonder/tss-plugins --path plugins/secaudit/skills
-```
 
 ## Contributing
 

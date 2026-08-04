@@ -5,6 +5,12 @@
   "author": {
     "name": "dani-mezei"
   },
+  "license": "MIT",
   "keywords": ["security", "sast", "code-audit", "vulnerability", "static-analysis"],
-  "skills": "./skills/"
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "secaudit",
+    "shortDescription": "Agentic source-code security audit for any local repository",
+    "category": "Security"
+  }
 }

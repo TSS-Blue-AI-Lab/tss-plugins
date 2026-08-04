@@ -6,5 +6,6 @@
   "author": {
     "name": "dani-mezei"
   },
+  "license": "MIT",
   "keywords": ["security", "sast", "code-audit", "vulnerability", "static-analysis"]
 }

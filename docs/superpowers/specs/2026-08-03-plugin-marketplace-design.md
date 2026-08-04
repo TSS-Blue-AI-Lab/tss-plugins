@@ -7,9 +7,8 @@
 ## Goal
 
 Set up `tss-plugins` as a public plugin marketplace hosting multiple plugins, installable
-natively from Claude Code and Codex (CLI + desktop app), and consumable by other agents
-(Cursor, Copilot, Gemini CLI, OpenCode, …) via the agent-agnostic skills.sh installer.
-First plugin: `secaudit`, copied from the `security-scanning` dev repo.
+natively from Claude Code and Codex (CLI + desktop app) — the two supported install
+channels. First plugin: `secaudit`, copied from the `security-scanning` dev repo.
 
 ## Roles of the two repos
 
@@ -84,7 +83,8 @@ tss-plugins/
 | Claude Code | `/plugin marketplace add AI-Lab-Yonder/tss-plugins` → `/plugin install secaudit@tss-plugins` |
 | Codex CLI | `codex plugin marketplace add AI-Lab-Yonder/tss-plugins` → `/plugins` → install |
 | Codex desktop app | Add marketplace via CLI (above), restart app, marketplace appears as selectable source in Plugins Directory |
-| Other agents | `npx skills add AI-Lab-Yonder/tss-plugins` (skills.sh detects agent, installs SKILL.md folders) |
+
+Claude Code and Codex are the only supported install channels.
 
 Notes:
 - Codex also reads `$REPO_ROOT/.claude-plugin/marketplace.json` as a legacy fallback;
@@ -95,9 +95,9 @@ Notes:
 ## Known trade-off
 
 Cursor/Gemini/Kimi-style extension manifests assume repo root = single plugin (why
-superpowers is one-plugin-per-repo). This monorepo covers Claude + Codex natively;
-everything else via skills.sh. If a specific agent later needs first-class support, that
-plugin can be split or tagged then.
+superpowers is one-plugin-per-repo). This monorepo covers Claude + Codex natively and
+nothing else; other agents are not a supported install path. If a specific agent later needs
+first-class support, that plugin can be split or tagged then.
 
 ## Release flow (revised 2026-08-04 — development happens here)
 
@@ -140,8 +140,8 @@ Job 2 — manifest validation (ubuntu):
   paths — salvaged from preflight.mjs). Dropped, not ported: `package-preflight`,
   `package-release`, `zip-roundtrip`, `validate-repo-hygiene` (packaging machinery).
 - Tests sit OUTSIDE `plugins/` so plugin installs never include them.
-- Manual smoke test after first release: install from a clean machine via all three
-  channels (Claude Code, Codex CLI, skills.sh) and run one secaudit skill.
+- Manual smoke test after first release: install from a clean machine via both supported
+  channels (Claude Code, Codex CLI) and run one secaudit skill.
 
 ## Out of scope
 
@@ -164,8 +164,6 @@ Job 2 — manifest validation (ubuntu):
 
 ### Still open / verify during implementation
 
-- skills.sh: `npx skills add` walks skill containers one level deep — nested
-  `plugins/secaudit/skills/` may need an explicit path in install docs. Verify by testing.
 - CI: confirm `claude plugin validate` works headless in GitHub Actions (install method,
   no-API-key operation).
 
@@ -178,6 +176,9 @@ Job 2 — manifest validation (ubuntu):
 8. CI expands to dev repo's pattern: OS×Node matrix running the suite + hardening (pinned
    SHAs, read-only permissions, concurrency) + the manifest-validation job. `.gitattributes`
    (`* text=auto eol=lf`) ports verbatim — golden-fixture byte comparisons require it.
+9. The third install channel for other agents (Cursor, Copilot, Gemini CLI, …) via the
+   agent-agnostic installer referenced earlier in this spec is dropped: it was documented but
+   never implemented or verified. Claude Code and Codex are the only supported channels.
 
 ### Changed by interview
 

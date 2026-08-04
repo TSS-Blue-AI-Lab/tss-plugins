@@ -91,7 +91,7 @@ if ('workflows' in claudePlugin) {
 }
 
 // The whole point of the canonical layout: no manifest may resurrect a retired path or leak a
-// developer's machine. Plan 5's package preflight reuses this list.
+// developer's machine.
 const FORBIDDEN = ['.claude/skills', '.agents/skills', 'eval/', '<private-client-identifier>', '.secaudit-local', '/Users/', '..']
 for (const [rel, reader] of [
   ['.claude-plugin/plugin.json', read],

@@ -30,18 +30,25 @@ publishes deterministic Markdown and HTML.
 
 ## Install
 
-**Claude Code**
+### Claude Code
 
 ```
-/plugin marketplace add <repo-url-or-local-path>
-/plugin install secaudit@secaudit
+/plugin marketplace add AI-Lab-Yonder/tss-plugins
+/plugin install secaudit@tss-plugins
 ```
 
-**Codex**
+### Codex CLI
 
-Add this repository as a plugin marketplace source, then install the `secaudit` plugin. The
-plugin root is the repository root, so the source is the repository itself, not a
-subdirectory.
+```
+codex plugin marketplace add AI-Lab-Yonder/tss-plugins
+```
+
+Then open `/plugins` and install `secaudit`.
+
+### Codex desktop app
+
+Add the marketplace via the Codex CLI command above, restart the app, then pick
+`tss-plugins` as the source in the Plugins Directory and install from there.
 
 Installing from a private repository uses your existing Git credentials (credential helper,
 SSH agent, or token). If a client cannot authenticate to the private remote in your
@@ -111,15 +118,27 @@ secaudit does not own are rejected before anything is copied.
 
 ## Layout
 
+What ships when you install the plugin:
+
 - `skills/` — the canonical skill tree for both clients: `run` (launcher), `sast-analysis` +
   `sast-hunter-*` (detection library), `secaudit-*` (pipeline stages), and the deterministic
   runtime under `skills/run/scripts/`
 - `workflows/secaudit.js` — the deterministic Claude Code workflow spine
-- `.claude-plugin/`, `.codex-plugin/`, `.agents/plugins/` — client and marketplace manifests
-- `tests/` — the deterministic suite; run it with
-  `for t in tests/*.test.mjs; do node "$t" || exit 1; done`
-- `docs/superpowers/` — design specifications and implementation plans, including historical
-  ones that describe layouts as they were when approved
+- `.claude-plugin/plugin.json`, `.codex-plugin/plugin.json` — per-client plugin manifests
+- `README.md` — this file
+
+Nothing else is packaged: tests, docs, and CI config live in this repository but are not part
+of the plugin a user installs.
+
+## Development
+
+This repository (`tss-plugins`) is the development home for the plugin, not just its
+marketplace host. Plugin content lives at `plugins/secaudit/` (the layout above); its tests
+live at `tests/secaudit/`. Run the suite with:
+
+```
+for t in tests/*/*.test.mjs; do node "$t"; done
+```
 
 Developer-only material — local corpora, private baselines, generated runs, scratch, and
 caches — lives under the ignored `.secaudit-local/` root and is never pushed or packaged.
