@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Scaffold `tss-plugins` as a public multi-agent plugin marketplace with `secaudit` v0.1.0 as its first plugin, installable from Claude Code and Codex, validated by CI.
+**Goal:** Scaffold `tss-plugins` as a public multi-agent plugin marketplace with `secaudit` v0.1.0 as its first plugin — including its test suite, since development happens in this repo from now on — installable from Claude Code and Codex, validated by CI.
 
-**Architecture:** Monorepo marketplace: root catalogs for Claude Code (`.claude-plugin/marketplace.json`) and Codex (`.agents/plugins/marketplace.json`) point at `plugins/secaudit/`, whose content is imported verbatim (tracked files only) from the `security-scanning` dev repo. One GitHub Actions workflow validates all manifests on every push/PR.
+**Architecture:** Monorepo marketplace and development home: root catalogs for Claude Code (`.claude-plugin/marketplace.json`) and Codex (`.agents/plugins/marketplace.json`) point at `plugins/secaudit/`, imported once (tracked files only) from the now-dormant `security-scanning` repo. Content tests port to `tests/secaudit/` (outside `plugins/` — installs never include them). CI runs the suite on an OS×Node matrix plus a manifest-validation job.
 
-**Tech Stack:** JSON manifests, GitHub Actions, `claude` CLI (`plugin validate`), `jq`, `git archive` for the import.
+**Tech Stack:** JSON manifests, Node ≥22 zero-framework `.test.mjs` suite, GitHub Actions, `claude` CLI (`plugin validate`), `jq`, `git archive` for the import.
 
 **Spec:** `docs/superpowers/specs/2026-08-03-plugin-marketplace-design.md`
 
@@ -16,7 +16,9 @@
 - Plugin version: `0.1.0`, identical in `.claude-plugin/plugin.json` and `.codex-plugin/plugin.json`.
 - Never set `version` in marketplace plugin entries — plugin.json is the version authority.
 - License: plain MIT, © AI Lab Yonder, `"license": "MIT"` in manifests.
-- `plugins/secaudit/` content comes only from the dev repo (tracked files); never hand-edit it after import. The dev repo's ROOT marketplace manifests (`.agents/plugins/marketplace.json`, `.claude-plugin/marketplace.json`) are NOT copied.
+- Initial import copies dev-repo tracked files only; the dev repo's ROOT marketplace manifests (`.agents/plugins/marketplace.json`, `.claude-plugin/marketplace.json`) and `scripts/` are NOT copied. After import, this repo is the source of truth — development happens here.
+- Tests live at `tests/secaudit/`, never inside `plugins/` (plugin installs copy the whole plugin dir).
+- Not ported (packaging machinery, obsolete): `scripts/`, `tests/package-preflight.test.mjs`, `tests/package-release.test.mjs`, `tests/zip-roundtrip.test.mjs`, `tests/validate-repo-hygiene.test.mjs`.
 - All names kebab-case.
 - Conventional commit messages (`feat:`, `docs:`, `ci:`, `chore:`).
 - Dev repo path on this machine: `../security-scanning`.
@@ -114,26 +116,39 @@ npx skills add AI-Lab-Yonder/tss-plugins --path plugins/secaudit/skills
 
 ## Contributing
 
-Plugin content under `plugins/` is release-synced from each plugin's development
-repository — do not edit those files here; the next release overwrites them wholesale.
-Direct changes in this repo are limited to the root marketplace manifests, this README,
-and CI.
+This repository is the development home for its plugins. Plugin content lives under
+`plugins/<name>/`, its tests under `tests/<name>/`. Run the suite with:
+
+```
+for t in tests/*/*.test.mjs; do node "$t"; done
+```
+
+Releases: bump `version` in the plugin's `.claude-plugin/plugin.json` AND
+`.codex-plugin/plugin.json` (must match), commit conventionally (`feat(secaudit): v0.2.0`).
 
 ## License
 
 MIT — see [LICENSE](LICENSE).
 ```
 
-- [ ] **Step 4: Verify files exist and README renders**
-
-Run: `ls LICENSE .gitignore README.md && head -3 README.md`
-Expected: three files listed; first heading `# tss-plugins`.
-
-- [ ] **Step 5: Commit**
+- [ ] **Step 4: Copy .gitattributes from dev repo (verbatim — LF pinning; golden-fixture byte comparisons and Windows CI depend on it)**
 
 ```bash
-git add LICENSE .gitignore README.md
-git commit -m "chore: add license, gitignore, marketplace readme"
+cp ../security-scanning/.gitattributes .gitattributes
+```
+
+Verify: `tail -1 .gitattributes` → `* text=auto eol=lf`
+
+- [ ] **Step 5: Verify files exist and README renders**
+
+Run: `ls LICENSE .gitignore .gitattributes README.md && head -3 README.md`
+Expected: four files listed; first heading `# tss-plugins`.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add LICENSE .gitignore .gitattributes README.md
+git commit -m "chore: add license, gitignore, gitattributes, marketplace readme"
 ```
 
 ---
@@ -282,18 +297,148 @@ git commit -m "feat: add codex marketplace catalog"
 
 ---
 
-### Task 5: CI validation workflow
+### Task 5: Port the secaudit test suite
 
 **Files:**
-- Create: `.github/workflows/validate.yml`
+- Create: `tests/secaudit/*.test.mjs` (19 ported files), `tests/secaudit/workflow-harness.mjs`, `tests/secaudit/fixtures/*`
+- Create: `tests/secaudit/preflight-policy.mjs` (helper extracted from dev `scripts/preflight.mjs`)
+- Create: `tests/secaudit/forbidden-references.test.mjs` (new)
 
 **Interfaces:**
-- Consumes: both marketplace manifests (Tasks 3–4), `plugins/*/.claude-plugin/plugin.json` and `plugins/*/.codex-plugin/plugin.json` (Task 2).
-- Produces: the release gate — every push/PR must pass before it reaches consumers.
+- Consumes: `plugins/secaudit/` tree from Task 2 (tests resolve the plugin root as `../../plugins/secaudit` relative to each test file).
+- Produces: the suite Task 6's CI matrix runs (`for t in tests/*/*.test.mjs; do node "$t"; done`).
+
+- [ ] **Step 1: Copy tests from dev repo (tracked files), drop the 4 packaging tests**
+
+```bash
+DEV=../security-scanning
+mkdir -p tests/secaudit
+git -C "$DEV" archive HEAD tests | tar -x --strip-components=1 -C tests/secaudit
+rm tests/secaudit/package-preflight.test.mjs \
+   tests/secaudit/package-release.test.mjs \
+   tests/secaudit/zip-roundtrip.test.mjs \
+   tests/secaudit/validate-repo-hygiene.test.mjs
+ls tests/secaudit/*.test.mjs | wc -l   # expect 19
+```
+
+- [ ] **Step 2: Create the policy helper (replaces imports of `../scripts/preflight.mjs`)**
+
+Write `tests/secaudit/preflight-policy.mjs` — functions copied verbatim from dev `scripts/preflight.mjs`:
+
+```javascript
+// Extracted from security-scanning scripts/preflight.mjs — the one predicate the content
+// tests share. Codex honours allow_implicit_invocation only as a direct child of the
+// top-level `policy:` key; no YAML parser here (zero dependencies), slice by indentation.
+const yamlBlock = (text, key) => {
+  const lines = text.split(/\r?\n/)
+  const start = lines.findIndex(line => new RegExp(`^${key}:\\s*$`).test(line))
+  if (start === -1) return null
+  let end = lines.length
+  for (let i = start + 1; i < lines.length; i++) {
+    if (/^\S/.test(lines[i])) { end = i; break }
+  }
+  return lines.slice(start + 1, end).join('\n')
+}
+const indentOf = line => /^[ \t]*/.exec(line)[0].length
+
+export const hasExplicitOnlyPolicy = text => {
+  const block = yamlBlock(text, 'policy')
+  if (block === null) return false
+  const lines = block.split('\n').filter(l => l.trim() !== '' && !/^[ \t]*#/.test(l))
+  if (lines.length === 0) return false
+  const childIndent = Math.min(...lines.map(indentOf))
+  return lines.some(l =>
+    indentOf(l) === childIndent && /^[ \t]*allow_implicit_invocation:[ \t]*false[ \t]*$/.test(l))
+}
+```
+
+- [ ] **Step 3: Adapt paths (repo root moved: tests now live two levels up from the plugin)**
+
+```bash
+cd tests/secaudit
+sed -i '' \
+  -e "s|fileURLToPath(import.meta.url)), '..')|fileURLToPath(import.meta.url)), '..', '..', 'plugins', 'secaudit')|g" \
+  -e "s|'\.\./skills/|'../../plugins/secaudit/skills/|g" \
+  -e "s|'\.\./workflows/|'../../plugins/secaudit/workflows/|g" \
+  -e "s|'\.\./scripts/preflight.mjs'|'./preflight-policy.mjs'|g" \
+  *.mjs
+cd ../..
+```
+
+Then hunt stragglers — any remaining reference that still points at the old layout:
+
+```bash
+grep -rn "\.\./skills\|\.\./scripts\|\.\./workflows\|'\.\./\.claude" tests/secaudit/*.mjs || echo NO-STRAGGLERS
+```
+Expected: `NO-STRAGGLERS`. Fix any hit by hand using the same mapping (plugin content → `../../plugins/secaudit/...`).
+
+- [ ] **Step 4: Run the suite; adapt `validate-manifests.test.mjs` expectations if needed**
+
+```bash
+set -e; for t in tests/secaudit/*.test.mjs; do echo "--- $t"; node "$t"; done
+```
+
+Expected: all pass. Known likely failure: `validate-manifests.test.mjs` asserted the DEV repo's manifest set (its root marketplace files, which were deliberately not copied). If it fails looking for a root `marketplace.json` inside the plugin dir, update its expectations to this repo's layout: plugin manifests at `plugins/secaudit/.claude-plugin/plugin.json` + `plugins/secaudit/.codex-plugin/plugin.json`, root catalogs at `.claude-plugin/marketplace.json` + `.agents/plugins/marketplace.json`. Keep every assertion that still has a subject; delete only assertions about files that no longer exist by design.
+
+- [ ] **Step 5: Write the forbidden-references test (salvaged idea from dev preflight)**
+
+`tests/secaudit/forbidden-references.test.mjs`:
+
+```javascript
+// Shipped plugin files must never reference dev-only paths: a consumer's install contains
+// only plugins/secaudit/**, so any such reference is a broken pointer by construction.
+import { readFileSync, readdirSync, statSync } from 'node:fs'
+import { join, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import assert from 'node:assert'
+
+const pluginRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'plugins', 'secaudit')
+const FORBIDDEN = ['.claude/skills', '.agents/skills', '.claude/commands', '.claude/workflows', '.secaudit-local/', '<private-client-identifier>']
+
+const walk = dir => readdirSync(dir).flatMap(name => {
+  const p = join(dir, name)
+  return statSync(p).isDirectory() ? walk(p) : [p]
+})
+
+const offenders = []
+for (const file of walk(pluginRoot)) {
+  if (!/\.(md|mjs|js|json|yaml|yml)$/.test(file)) continue
+  const text = readFileSync(file, 'utf8')
+  for (const ref of FORBIDDEN) {
+    if (text.includes(ref)) offenders.push(`${file}: ${ref}`)
+  }
+}
+assert.deepStrictEqual(offenders, [], `forbidden references in shipped files:\n${offenders.join('\n')}`)
+console.log('forbidden-references: ok')
+```
+
+- [ ] **Step 6: Run the new test**
+
+Run: `node tests/secaudit/forbidden-references.test.mjs`
+Expected: `forbidden-references: ok` (if it fails, the listed file/reference pairs are real defects imported from dev — report them, do not weaken the list).
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add tests
+git commit -m "test(secaudit): port content test suite from security-scanning"
+```
+
+---
+
+### Task 6: CI workflow
+
+**Files:**
+- Create: `.github/workflows/ci.yml`
+
+**Interfaces:**
+- Consumes: test suite (Task 5), both marketplace manifests (Tasks 3–4), per-plugin plugin.json pairs (Task 2).
+- Produces: the merge/release gate — every push/PR must pass.
 
 - [ ] **Step 1: Run each future CI check locally first (they must pass before wiring CI)**
 
 ```bash
+set -e; for t in tests/*/*.test.mjs; do node "$t"; done
 claude plugin validate . --strict
 jq -e '.name and (.plugins | length) > 0 and all(.plugins[]; .name and .source.path and .policy)' .agents/plugins/marketplace.json
 for p in plugins/*/; do
@@ -302,25 +447,62 @@ for p in plugins/*/; do
   [ "$c" = "$x" ] && echo "OK $p $c" || { echo "MISMATCH $p $c vs $x"; exit 1; }
 done
 ```
-Expected: validator exit 0; `true`; `OK plugins/secaudit/ 0.1.0`.
+Expected: suite passes; validator exit 0; `true`; `OK plugins/secaudit/ 0.1.0`.
 
-- [ ] **Step 2: Write workflow**
+- [ ] **Step 2: Write workflow (hardening ported from dev ci.yml: read-only permissions, concurrency, SHA-pinned actions)**
 
 ```yaml
-name: validate
+name: ci
 
 on:
   push:
-    branches: [main]
+    branches: ['**']
   pull_request:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  validate:
+  test:
+    name: tests (${{ matrix.os }}, node ${{ matrix.node }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            node: 22
+          - os: ubuntu-latest
+            node: 22
+          - os: windows-latest
+            node: 22
+          - os: ubuntu-latest
+            node: 24
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: ${{ matrix.node }}
+      # Windows runners provide Bash, so one loop covers all three platforms.
+      - name: Run the deterministic suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          for t in tests/*/*.test.mjs; do
+            echo "--- $t"
+            node "$t"
+          done
+
+  manifests:
+    name: manifest validation
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 22
 
@@ -353,25 +535,25 @@ validation to get CI green.
 
 - [ ] **Step 3: Validate workflow YAML syntax**
 
-Run: `node -e "console.log('yaml ok')" && npx --yes yaml-lint .github/workflows/validate.yml || python3 -c "import yaml,sys; yaml.safe_load(open('.github/workflows/validate.yml')); print('yaml ok')"`
+Run: `python3 -c "import yaml; yaml.safe_load(open('.github/workflows/ci.yml')); print('yaml ok')" || npx --yes yaml-lint .github/workflows/ci.yml`
 Expected: `yaml ok` (either linter suffices).
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add .github/workflows/validate.yml
-git commit -m "ci: validate marketplace manifests and version consistency"
+git add .github/workflows/ci.yml
+git commit -m "ci: test matrix and marketplace manifest validation"
 ```
 
 ---
 
-### Task 6: End-to-end local smoke test
+### Task 7: End-to-end local smoke test
 
 **Files:**
 - None created — verification only. (If a fix is needed, it happens in the task that owns the file, then re-run this task.)
 
 **Interfaces:**
-- Consumes: the whole repo state from Tasks 1–5.
+- Consumes: the whole repo state from Tasks 1–6.
 
 - [ ] **Step 1: Full-tree validation from a clean checkout state**
 

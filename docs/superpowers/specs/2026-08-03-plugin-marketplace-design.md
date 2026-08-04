@@ -13,10 +13,11 @@ First plugin: `secaudit`, copied from the `security-scanning` dev repo.
 
 ## Roles of the two repos
 
-- `security-scanning` — **dev** repo. All development, tests, dev tooling stay here.
-- `tss-plugins` — **prod** repo. Clean, public-ready, release artifacts only.
-  Clean linear git history: one conventional commit per plugin release.
-- Retiring the dev repo is deferred; for now dev → prod sync is a release step.
+**Revised 2026-08-04:** `tss-plugins` is the source of truth from now on — development,
+tests, and releases all happen here. `security-scanning` goes dormant after the initial
+import (archive whenever convenient); its packaging pipeline (`scripts/package-release.mjs`,
+`preflight.mjs`, `zip.mjs`) is not ported — it existed only for dev→prod publishing, which
+no longer exists. Resurrect from its git history if release zips are ever needed.
 
 ## Repository layout
 
@@ -36,9 +37,15 @@ tss-plugins/
 │       ├── skills/               # ONE canonical skill tree — serves every agent
 │       ├── workflows/            # secaudit.js — deterministic Claude Code workflow
 │       └── README.md             # plugin docs (pipeline, usage, install)
+├── tests/
+│   └── secaudit/                 # test suite for the secaudit plugin (NOT shipped —
+│       ├── fixtures/             #   outside plugins/, so installs never include it)
+│       ├── workflow-harness.mjs  # helpers: harness + preflight-policy.mjs
+│       └── *.test.mjs            # 19 ported content tests + forbidden-references test
 ├── .github/
 │   └── workflows/
-│       └── validate.yml          # CI validation on every push/PR
+│       └── ci.yml                # tests (OS×Node matrix) + manifest validation
+├── .gitattributes                # `* text=auto eol=lf` — golden fixtures compare bytes
 ├── README.md                     # marketplace overview + per-agent install matrix
 └── LICENSE                       # plain MIT, © AI Lab Yonder
 ```
@@ -92,29 +99,26 @@ superpowers is one-plugin-per-repo). This monorepo covers Claude + Codex nativel
 everything else via skills.sh. If a specific agent later needs first-class support, that
 plugin can be split or tagged then.
 
-## Release flow (dev → prod)
+## Release flow (revised 2026-08-04 — development happens here)
 
-Dev repo already has release tooling: `scripts/package-release.mjs` + `scripts/preflight.mjs`
-build a validated package from a tracked-file allowlist (`PACKAGE_PREFIXES`:
-`.claude-plugin/`, `.codex-plugin/`, `.agents/plugins/`, `skills/`, `workflows/`, `README.md`).
-That allowlist is the authoritative copy scope. Only missing piece: extracting the package
-into `tss-plugins/plugins/secaudit/` (per-agent plugin manifests come along; the dev repo's
-root marketplace manifests are NOT copied — tss-plugins authors its own).
+Initial import: one-time copy of the dev repo's tracked plugin files (`.claude-plugin/plugin.json`,
+`.codex-plugin/`, `skills/`, `workflows/`, `README.md`) into `plugins/secaudit/`, and the
+content test suite into `tests/secaudit/` (adapted paths). After that:
 
-1. Develop and test in `security-scanning`.
-2. Run the release packaging, extract into `tss-plugins/plugins/secaudit/`.
-   Never copied: tests, caches, dev scripts, `.secaudit-local`, `.worktrees`, `.superpowers`.
-3. Bump `version` in both plugin.json files (they must match).
-4. One conventional commit: `feat(secaudit): v0.2.0`.
-5. CI green → push. Users pick up the release via `/plugin marketplace update`.
+1. Develop directly in `plugins/secaudit/`, tests in `tests/secaudit/`.
+2. To release: bump `version` in both plugin.json files (they must match), conventional
+   commit (`feat(secaudit): v0.2.0`), CI green, push.
+3. Users pick up the release via `/plugin marketplace update`.
 
-Edit policy: plugin fixes always go to `security-scanning`, then re-release — never edit
-`plugins/*` files directly in tss-plugins (the next release overwrites them wholesale).
-Direct edits here are limited to root marketplace manifests, README, CI.
+## CI (`ci.yml`)
 
-## CI validation (`validate.yml`)
+Hardening (ported from dev repo's ci.yml): `permissions: contents: read`, concurrency
+group with cancel-in-progress, actions pinned by commit SHA.
 
-On push/PR:
+Job 1 — tests, OS×Node matrix (macos/ubuntu/windows × Node 22, plus ubuntu × Node 24):
+run `node tests/secaudit/*.test.mjs` (deterministic suite, no framework).
+
+Job 2 — manifest validation (ubuntu):
 1. `claude plugin validate . --strict` — official schema validation (marketplace.json,
    plugin.json, skill frontmatter, duplicate names, path traversal).
 2. JSON syntax check on `.agents/plugins/marketplace.json` and `.codex-plugin/plugin.json`
@@ -130,16 +134,20 @@ On push/PR:
 
 ## Testing
 
-- CI checks above are the test surface for this repo. Plugin behavior tests remain in the
-  dev repo — prod repo ships release artifacts, not test infrastructure.
+- Plugin behavior tests live at `tests/secaudit/` (ported from dev repo): 19 content tests
+  (runtime, skill vocabularies, workflow behavior via harness, manifests, reports against
+  golden fixtures) + a forbidden-references test (shipped files must not mention dev-only
+  paths — salvaged from preflight.mjs). Dropped, not ported: `package-preflight`,
+  `package-release`, `zip-roundtrip`, `validate-repo-hygiene` (packaging machinery).
+- Tests sit OUTSIDE `plugins/` so plugin installs never include them.
 - Manual smoke test after first release: install from a clean machine via all three
   channels (Claude Code, Codex CLI, skills.sh) and run one secaudit skill.
 
 ## Out of scope
 
-- The dev-repo extract-into-tss-plugins step (separate task in `security-scanning`).
 - Official directory submissions (openai/plugins, claude-plugins-official).
 - Additional plugins beyond secaudit (layout already accommodates them).
+- Release zip packaging (dropped with the dev/prod split; in dev repo's git history if needed).
 
 ## Decision record (interview 2026-08-03)
 
@@ -160,6 +168,16 @@ On push/PR:
   `plugins/secaudit/skills/` may need an explicit path in install docs. Verify by testing.
 - CI: confirm `claude plugin validate` works headless in GitHub Actions (install method,
   no-API-key operation).
+
+### Revised 2026-08-04 (supersedes decisions 3 and parts of the layout)
+
+6. Development moves to tss-plugins → this repo is the source of truth; `security-scanning`
+   dormant after import. Kills decision 3's fix-routing and the dev→prod sync flow.
+7. Tests port here (content tests only, 19 files + fixtures + harness) into `tests/secaudit/`;
+   packaging tests and `scripts/` are NOT ported. One salvage: forbidden-references test.
+8. CI expands to dev repo's pattern: OS×Node matrix running the suite + hardening (pinned
+   SHAs, read-only permissions, concurrency) + the manifest-validation job. `.gitattributes`
+   (`* text=auto eol=lf`) ports verbatim — golden-fixture byte comparisons require it.
 
 ### Changed by interview
 
