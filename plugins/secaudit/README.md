@@ -47,8 +47,12 @@ Then open `/plugins` and install `secaudit`.
 
 ### Codex desktop app
 
-Add the marketplace via the Codex CLI command above, restart the app, then pick
-`tss-plugins` as the source in the Plugins Directory and install from there.
+No CLI needed — the app has a UI for this:
+
+1. Open **Plugins**, then **Create** → **Add Marketplace**, and add
+   `AI-Lab-Yonder/tss-plugins`.
+2. Back in **Plugins**, open the **Personal** tab, find **secaudit** under
+   **TSS Plugins**, and hit **Install**.
 
 Installing from a private repository uses your existing Git credentials (credential helper,
 SSH agent, or token). If a client cannot authenticate to the private remote in your

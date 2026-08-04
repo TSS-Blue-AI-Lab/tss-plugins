@@ -82,7 +82,7 @@ tss-plugins/
 |---|---|
 | Claude Code | `/plugin marketplace add AI-Lab-Yonder/tss-plugins` → `/plugin install secaudit@tss-plugins` |
 | Codex CLI | `codex plugin marketplace add AI-Lab-Yonder/tss-plugins` → `/plugins` → install |
-| Codex desktop app | Add marketplace via CLI (above), restart app, marketplace appears as selectable source in Plugins Directory |
+| Codex desktop app | UI only, no CLI: Plugins → Create → Add Marketplace → `AI-Lab-Yonder/tss-plugins`; then Plugins → Personal → Install on TSS Plugins' secaudit |
 
 Claude Code and Codex are the only supported install channels.
 
