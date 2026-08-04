@@ -1,0 +1,125 @@
+# secaudit — agentic code-audit framework
+
+An installable plugin that runs a whitebox security audit of a source repository from inside a
+coding agent. Seeded from [sast-skills](https://github.com/utkusen/sast-skills) (MIT) and
+evolved in small versions; it implements the Cloudflare "Project Glasswing" vulnerability
+discovery harness as a single-repo pipeline.
+
+One canonical skill tree serves both supported clients. Claude Code drives it with a
+deterministic workflow; Codex drives the same skills with a portable prose runbook. Both share
+the same stages, bounds, deterministic runtime, and artifact contract.
+
+## Pipeline
+
+Recon → Hunt → Challenge → Dedupe → Trace → Generate Artifacts
+
+Optional: Challenge → Blindspot Sweep → Hunt → Challenge (a single replay, disabled by default).
+
+One Hunter runs per selected vulnerability class; Challenge independently re-checks every new
+finding; Trace judges reachability; Generate Artifacts validates structured report data and
+publishes deterministic Markdown and HTML.
+
+## Requirements
+
+- **Node.js 22 or newer on PATH.** Neither client bundles a usable Node. The launcher
+  preflights `node --version` and stops with an install message before doing anything else.
+  Get it from https://nodejs.org.
+- Claude Code, or Codex.
+- No other dependencies: the deterministic runtime uses Node built-ins only and has no install
+  step.
+
+## Install
+
+**Claude Code**
+
+```
+/plugin marketplace add <repo-url-or-local-path>
+/plugin install secaudit@secaudit
+```
+
+**Codex**
+
+Add this repository as a plugin marketplace source, then install the `secaudit` plugin. The
+plugin root is the repository root, so the source is the repository itself, not a
+subdirectory.
+
+Installing from a private repository uses your existing Git credentials (credential helper,
+SSH agent, or token). If a client cannot authenticate to the private remote in your
+environment, clone the remote locally and install the plugin from that clone — this tests the
+same committed package boundary.
+
+## Run
+
+A full audit is **explicit-only**: installing the plugin never authorizes either client to
+start one on its own initiative, because a full run spawns many agents and costs real money.
+
+```
+Claude Code: /secaudit:run [repo-path] [--output <exact-run-directory>]
+Codex:       $secaudit:run [repo-path] [--output <exact-run-directory>]
+```
+
+`repo-path` is optional and accepts an absolute or relative directory; when omitted, secaudit
+audits the Git toplevel above your current directory, or the current directory if it is not in
+a repository. The target does not have to be a Git repository. Before any spend, the launcher
+shows you the resolved target, a size and estimated-token line, a recommended Hunter subset,
+and asks which Hunters to run and whether to include the Blindspot Sweep.
+
+secaudit never modifies the repository being audited: it hashes the source, audits an isolated
+copy, and re-hashes before publishing. If the source changed mid-audit, publication aborts.
+
+## Output
+
+One run writes exactly one directory:
+
+```
+<target>/.secaudit/runs/<run-id>/
+├── report.md          # findings, buckets, counts
+├── report.html         # the same report, rendered
+├── trace.md            # corpus hash, coverage, template version, stage ledger
+└── work/sast/          # retained evidence: per-Hunter results, deduped set, report data
+```
+
+`<run-id>` is a UTC timestamp plus the first eight characters of the source hash. Every run
+directory inside the target carries its own `.gitignore`, so no run — default or `--output` —
+makes a clean target repository look dirty. That matters beyond tidiness: the work tree is a
+verbatim copy of the target including dotfiles, so an unignored run directory puts real
+`.env` secrets one `git add -A` from a commit.
+
+Run directories are **ephemeral by design**: they are git-ignored, and deleting the checkout
+deletes the audit history with it. Copy out anything worth keeping. Deleting
+`<target>/.secaudit/runs/<run-id>/` is safe at any time — that is how you reclaim disk.
+
+`--output` overrides the exact run directory, not just its parent. Paths that would make the
+isolated copy contain itself, that contain the target, or that point at a non-empty directory
+secaudit does not own are rejected before anything is copied.
+
+## Limitations
+
+- **Concurrent runs against one target are unsupported.** Run identifiers do not collide, but
+  which run publishes is undefined. Run one audit per target at a time.
+- Vendored and generated code is out of scope: a fixed built-in denylist (`.git`, `.secaudit`,
+  `node_modules`, `bin`, `obj`, `dist`, `build`, `vendor`, `.venv`, `venv`, `target`,
+  `__pycache__`) is excluded from measurement, hashing, and copying. There are no user-facing
+  include/exclude flags in v1.
+- Symlinks resolving outside the target are never followed into the audit corpus; they are
+  recorded as skipped so coverage stays visible.
+- Dependency and vulnerability scanning of manifests and lockfiles is a separate concern and is
+  not part of this pipeline.
+- Resume after an interrupted run is a Claude Code workflow capability only; it is not promised
+  in Codex.
+- secaudit reports findings with evidence. It never certifies that a codebase is secure.
+
+## Layout
+
+- `skills/` — the canonical skill tree for both clients: `run` (launcher), `sast-analysis` +
+  `sast-hunter-*` (detection library), `secaudit-*` (pipeline stages), and the deterministic
+  runtime under `skills/run/scripts/`
+- `workflows/secaudit.js` — the deterministic Claude Code workflow spine
+- `.claude-plugin/`, `.codex-plugin/`, `.agents/plugins/` — client and marketplace manifests
+- `tests/` — the deterministic suite; run it with
+  `for t in tests/*.test.mjs; do node "$t" || exit 1; done`
+- `docs/superpowers/` — design specifications and implementation plans, including historical
+  ones that describe layouts as they were when approved
+
+Developer-only material — local corpora, private baselines, generated runs, scratch, and
+caches — lives under the ignored `.secaudit-local/` root and is never pushed or packaged.

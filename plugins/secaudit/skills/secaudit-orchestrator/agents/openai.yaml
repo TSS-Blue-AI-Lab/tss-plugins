@@ -1,0 +1,8 @@
+interface:
+  display_name: secaudit orchestrator
+  short_description: Portable stage-by-stage runbook for the full secaudit pipeline (explicit-only).
+
+policy:
+  # Same full pipeline as the run skill, driven as prose. Gating run alone would leave this
+  # as an implicit back door into the expensive path.
+  allow_implicit_invocation: false
