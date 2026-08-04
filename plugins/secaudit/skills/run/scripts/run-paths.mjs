@@ -24,6 +24,13 @@ export function findGitToplevel(startDir) {
   }
 }
 
+// How resolveTarget arrived at its answer. The SKILL confirms a guessed target with the user
+// before any write, and lets an explicitly named one through untouched.
+export function targetSource(input, cwd) {
+  if (input) return 'explicit'
+  return findGitToplevel(cwd) ? 'gitToplevel' : 'cwd'
+}
+
 // Omitted input → git toplevel above cwd, else cwd (spec review decision 5).
 export async function resolveTarget(input, cwd) {
   const candidate = input ? resolve(cwd, input) : (findGitToplevel(cwd) ?? resolve(cwd))

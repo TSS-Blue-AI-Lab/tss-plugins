@@ -71,6 +71,11 @@ a repository. The target does not have to be a Git repository. Before any spend,
 shows you the resolved target, a size and estimated-token line, a recommended Hunter subset,
 and asks which Hunters to run and whether to include the Blindspot Sweep.
 
+When the path was omitted, the resolved target is a guess — and from a subdirectory it widens
+to the whole repository — so the launcher asks you to confirm it, or name a different one,
+before writing anything. Pass `repo-path` explicitly to skip that question and to audit a
+subdirectory on its own.
+
 secaudit never modifies the repository being audited: it hashes the source, audits an isolated
 copy, and re-hashes before publishing. If the source changed mid-audit, publication aborts.
 

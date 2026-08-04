@@ -7,7 +7,7 @@ import { existsSync } from 'node:fs'
 import { extname, join, dirname, sep, isAbsolute, relative, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { enumerateSource, measureSource, EXCLUDED_DIR_NAMES, hashSource } from './source-corpus.mjs'
-import { RuntimeError, resolveTarget, makeRunId, selectRunDir, writeMarker, canonicalizePlanned } from './run-paths.mjs'
+import { RuntimeError, resolveTarget, targetSource, makeRunId, selectRunDir, writeMarker, canonicalizePlanned } from './run-paths.mjs'
 
 const USAGE = `Usage:
   node secaudit-runtime.mjs inspect --target <path>
@@ -89,6 +89,7 @@ export async function inspect(options) {
   }
   return {
     target,
+    targetSource: targetSource(options.target, process.cwd()),
     coverage,
     extensions,
     manifests: files.filter(isManifest),

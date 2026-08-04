@@ -60,6 +60,16 @@ subdirectory") and a Layout section listing `tests/` and `docs/` as though they 
 inside the plugin. Both were rewritten to this repo's reality. This is the one place the
 verbatim-import rule was deliberately set aside — the file is user-facing and was wrong.
 
+### Post-review — guessed audit targets are now confirmed
+
+Raised during the branch walkthrough: omitting the repo path lets the runtime pick the target by
+walking up to the nearest `.git`, which from a subdirectory silently widens the audit to the whole
+repository. Resolution itself was correct and is unchanged; what was missing was consent. `inspect`
+now reports `targetSource` (`explicit` | `gitToplevel` | `cwd`), and both launchers (`run`,
+`secaudit-orchestrator`) must confirm anything other than `explicit` before `prepare` writes.
+An explicitly passed `--target` is unaffected — no extra prompt, and it still accepts a plain
+directory, so a subdirectory or non-Git tree can be audited on its own.
+
 ## Notes
 
 - Manifests gained the spec-promised fields that the verbatim import lacked:

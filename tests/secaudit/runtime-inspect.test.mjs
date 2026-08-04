@@ -31,6 +31,38 @@ assert.deepStrictEqual(out.exclusionsApplied, ['node_modules'])
 assert.ok(Array.isArray(out.exclusionPolicy) && out.exclusionPolicy.includes('.secaudit'))
 assert.deepStrictEqual(out.warnings, [])
 
+// How the target was arrived at, so the SKILL can tell "the user named this path" apart from
+// "the runtime guessed it" and only gate the guess behind a confirmation.
+assert.strictEqual(out.targetSource, 'explicit')
+
+// Omitted --target, cwd inside a git repo → the repo root, flagged as a guess. A subdirectory
+// must resolve upward to the root, which is exactly the widening that needs confirming.
+const repo = realpathSync.native(mkdtempSync(join(tmpdir(), 'secaudit-repo-')))
+mkdirSync(join(repo, '.git'))
+mkdirSync(join(repo, 'sub'))
+writeFileSync(join(repo, 'sub', 'app.js'), 'let x = 1\n', 'utf8')
+const guessed = JSON.parse(
+  execFileSync('node', [cli, 'inspect'], { cwd: join(repo, 'sub') }).toString('utf8'))
+assert.strictEqual(guessed.target, repo)
+assert.strictEqual(guessed.targetSource, 'gitToplevel')
+
+// A submodule's .git is a file, not a directory; the walk stops there rather than climbing
+// into the superproject, so a submodule audit is still the submodule.
+const sub = join(repo, 'mod')
+mkdirSync(sub)
+writeFileSync(join(sub, '.git'), 'gitdir: ../.git/modules/mod\n', 'utf8')
+writeFileSync(join(sub, 'app.js'), 'let x = 1\n', 'utf8')
+const inSub = JSON.parse(execFileSync('node', [cli, 'inspect'], { cwd: sub }).toString('utf8'))
+assert.strictEqual(inSub.target, sub, 'submodule root wins over the superproject')
+assert.strictEqual(inSub.targetSource, 'gitToplevel')
+
+// Omitted --target with no git anywhere above → cwd, still a guess but a different one.
+const bare = realpathSync.native(mkdtempSync(join(tmpdir(), 'secaudit-bare-')))
+writeFileSync(join(bare, 'app.js'), 'let x = 1\n', 'utf8')
+const bareOut = JSON.parse(execFileSync('node', [cli, 'inspect'], { cwd: bare }).toString('utf8'))
+assert.strictEqual(bareOut.target, bare)
+assert.strictEqual(bareOut.targetSource, 'cwd')
+
 // Read-only: inspect must not create .secaudit or anything else in the target.
 assert.ok(!existsSync(join(target, '.secaudit')))
 assert.deepStrictEqual(readdirSync(target).sort(), ['app.js', 'node_modules', 'package.json'])

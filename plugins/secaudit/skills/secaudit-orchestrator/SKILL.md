@@ -45,8 +45,14 @@ Inspect the target to ground the Hunter recommendation and cost estimate:
 - Run the deterministic inspection (read-only, never writes to the target):
   `node "<PLUGIN_ROOT>/skills/run/scripts/secaudit-runtime.mjs" inspect --target "<target>"` — omit
   `--target` when the user gave no path (the runtime resolves the Git toplevel, else the
-  invocation directory). Parse its one-line JSON `{target, coverage, extensions, manifests,
-  warnings, …}` and show the resolved `target` to the user.
+  invocation directory). Parse its one-line JSON `{target, targetSource, coverage, extensions,
+  manifests, warnings, …}` and show the resolved `target` to the user.
+- **A guessed target must be confirmed before anything is written.** `targetSource` is
+  `explicit` (user named it), `gitToplevel` (walked up to the nearest repository root) or `cwd`.
+  A guess can be wider than intended — invoked from `repo/services/api` it audits all of `repo`
+  — so when it is not `explicit`, ask the user to confirm the path or supply another, alongside
+  the size line below. On a different path, re-run `inspect --target "<their path>"` and redo
+  this section; the earlier `coverage` and recommendations are stale.
 - **Print the size line** from `coverage`: `Repo: <sourceLines> source LOC,
   ~<estimatedSourceTokens> source tokens`.
 - **Estimate full-scan token cost and tell the user.** Rough heuristic: `FIXED ≈ 120k` (Recon + Dedupe + Trace + Generate Artifacts) plus `nHunters × (40k + coverage.estimatedSourceTokens)`; a Blindspot Sweep replay roughly doubles the hunt+challenge portion. Print an order-of-magnitude bracket, e.g. `Est. full scan (N hunters, blindspot sweep off): ~XXXk–YYYk tokens.` — a bracket, not false precision.

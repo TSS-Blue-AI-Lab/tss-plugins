@@ -48,11 +48,17 @@ node "<PLUGIN_ROOT>/skills/run/scripts/secaudit-runtime.mjs" inspect --target <r
 
 Omit `--target` entirely when the user gave no path — the runtime resolves the Git
 toplevel above the current directory, else the current directory. Parse the one-line
-JSON: `{target, coverage, extensions, manifests, exclusionsApplied, warnings, …}`. On
-`{"error":{code,message}}`, report the message and stop.
+JSON: `{target, targetSource, coverage, extensions, manifests, exclusionsApplied, warnings, …}`.
+On `{"error":{code,message}}`, report the message and stop.
 
 **Show the resolved `target` to the user before anything else** — they must see what
 would be audited. Surface any `warnings` verbatim.
+
+`targetSource` says how that path was arrived at: `explicit` (the user named it), `gitToplevel`
+(guessed by walking up from the current directory to the nearest repository root), or `cwd`
+(guessed, no repository found). A guess can be wider than the user meant — running from
+`repo/services/api` audits all of `repo` — so anything other than `explicit` MUST be confirmed
+in Step 2 before Step 3 writes anything.
 
 **Print the size line** from `coverage`:
 `Repo: <sourceLines> source LOC, ~<estimatedSourceTokens> source tokens`.
@@ -86,7 +92,21 @@ all be shown as checkboxes. The user must still be able to SEE every available c
 hunter question text MUST list all 14 valid class names verbatim. Never leave the user
 guessing what they can type.
 
-Ask two questions in one AskUserQuestion call:
+Ask these in one AskUserQuestion call — the target question only when Step 1 reported
+`targetSource` other than `explicit`:
+
+0. **Target** (single select, ask ONLY when `targetSource !== "explicit"`). Question text:
+   "No path was given, so I resolved the target by <`gitToplevel` → walking up to the nearest
+   Git repository root / `cwd` → using the current directory>. Audit `<target>`?" State the
+   size line from Step 1 alongside it, so the scope is visible as a number too.
+
+   Options:
+   1. **Yes, audit `<target>` (Recommended)** — the resolved path.
+   2. **A different path** — the user supplies one via Other; re-run Step 1 `inspect` with
+      `--target <their path>` and start Step 2 again with the new numbers.
+
+   Never skip this question by inferring consent from the hunter answer. If the user picks a
+   different path, the old `target`, `coverage` and recommendations are stale — discard them.
 
 1. **Hunters** (multiSelect). Question text MUST include:
    - The full valid class list verbatim: `businesslogic, fileupload, graphql, hardcodedsecrets,
