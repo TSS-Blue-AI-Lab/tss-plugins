@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://secaudit.local/schema/report-data-v1.json",
+  "title": "secaudit report data v1",
+  "description": "ADVISORY REFERENCE ONLY — nothing loads this file at runtime (the pipeline ships no JSON-Schema checker and no third-party deps). The authoritative, enforced contract is validateReportData() in report-contract.mjs, which additionally checks cross-field rules this schema cannot express (id === findingId, bucket-conditional required fields, estimatedSourceTokens === ceil(sourceBytes/4)). Keep the two in sync by hand when either changes.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "metadata", "coverage", "findings"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "metadata": { "$ref": "#/$defs/metadata" },
+    "coverage": { "$ref": "#/$defs/coverage" },
+    "findings": { "type": "array", "items": { "$ref": "#/$defs/finding" } }
+  },
+  "$defs": {
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["project", "generatedDate", "hunters"],
+      "properties": {
+        "project": { "type": "string", "minLength": 1 },
+        "generatedDate": {
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+        },
+        "hunters": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "businesslogic", "fileupload", "graphql", "hardcodedsecrets", "idor", "jwt",
+              "missingauth", "pathtraversal", "rce", "sqli", "ssrf", "ssti", "xss", "xxe"
+            ]
+          }
+        }
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceFiles", "sourceLines", "sourceBytes", "estimatedSourceTokens"],
+      "properties": {
+        "sourceFiles": { "type": "integer", "minimum": 0 },
+        "sourceLines": { "type": "integer", "minimum": 0 },
+        "sourceBytes": { "type": "integer", "minimum": 0 },
+        "estimatedSourceTokens": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id", "title", "class", "path", "line",
+        "challengeVerdict", "challengeReason", "traceVerdict", "traceEvidence",
+        "severity", "impact", "remediation", "dynamicTest"
+      ],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "title": { "type": "string", "minLength": 1 },
+        "class": {
+          "type": "string",
+          "enum": [
+            "businesslogic", "fileupload", "graphql", "hardcodedsecrets", "idor", "jwt",
+            "missingauth", "pathtraversal", "rce", "sqli", "ssrf", "ssti", "xss", "xxe"
+          ]
+        },
+        "path": { "type": "string", "minLength": 1 },
+        "line": { "type": "integer", "minimum": 1 },
+        "challengeVerdict": { "type": "string", "enum": ["DEFECT", "NOT-A-DEFECT", "UNSURE"] },
+        "challengeReason": { "type": "string", "minLength": 1 },
+        "traceVerdict": { "type": ["string", "null"], "enum": ["REACHABLE", "UNREACHABLE", "NEEDS-PROOF", null] },
+        "traceEvidence": { "type": ["string", "null"] },
+        "severity": { "type": ["string", "null"], "enum": ["Critical", "High", "Medium", "Low", null] },
+        "impact": { "type": ["string", "null"] },
+        "remediation": { "type": ["string", "null"] },
+        "dynamicTest": { "type": ["string", "null"] }
+      }
+    }
+  }
+}

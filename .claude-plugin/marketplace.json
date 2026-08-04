@@ -1,0 +1,18 @@
+{
+  "name": "tss-plugins",
+  "owner": {
+    "name": "AI Lab Yonder",
+    "url": "https://github.com/AI-Lab-Yonder"
+  },
+  "description": "AI Lab Yonder public plugin marketplace.",
+  "plugins": [
+    {
+      "name": "secaudit",
+      "source": "./plugins/secaudit",
+      "description": "Agentic source-code security audit: Recon, one Hunter per vulnerability class, adversarial Challenge, Dedupe, reachability Trace, and deterministic report publication. Never mutates the target repository.",
+      "category": "Security",
+      "license": "MIT",
+      "keywords": ["security", "sast", "code-audit", "vulnerability", "static-analysis"]
+    }
+  ]
+}

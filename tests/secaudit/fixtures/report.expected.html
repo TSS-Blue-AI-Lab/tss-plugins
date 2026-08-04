@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="secaudit-template-version" content="1">
+  <title>Security Assessment Report — Demo Service</title>
+  <style>
+    :root {
+      --canvas: #e9eef5;
+      --surface: #ffffff;
+      --accent: #214e8a;
+      --text: #162033;
+      --muted: #66758a;
+      --border: #d8e0ea;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--canvas);
+      color: var(--text);
+      font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    main {
+      width: min(1120px, calc(100% - 48px));
+      margin: 32px auto;
+      overflow: hidden;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+    }
+    .accent { height: 6px; background: var(--accent); }
+    .inner { padding: 36px; }
+    header {
+      display: flex;
+      align-items: start;
+      justify-content: space-between;
+      gap: 32px;
+      padding-bottom: 28px;
+      border-bottom: 1px solid var(--border);
+    }
+    h1, h2, h3, p { margin-top: 0; }
+    h1 { margin-bottom: 0; font-size: clamp(28px, 4vw, 42px); line-height: 1.1; letter-spacing: -0.025em; }
+    h2 { margin: 38px 0 14px; font-size: 20px; }
+    h3 { margin-bottom: 10px; font-size: 16px; }
+    .meta { display: grid; min-width: min(100%, 360px); gap: 10px; }
+    .meta div { display: grid; grid-template-columns: 105px minmax(0, 1fr); gap: 12px; }
+    .meta b, .eyebrow, dt { color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+    .meta span, .finding-title, dd, code, pre { overflow-wrap: anywhere; word-break: break-word; }
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 24px;
+      padding: 14px;
+      background: #f5f7fa;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+    }
+    .count, .coverage-item {
+      padding: 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 13px;
+    }
+    .count strong, .coverage-item strong { display: block; margin-top: 5px; font-size: 28px; line-height: 1; }
+    details {
+      overflow: hidden;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 13px;
+    }
+    details + details { margin-top: 10px; }
+    summary { cursor: pointer; padding: 18px 20px; font-weight: 700; }
+    summary::marker { color: var(--accent); }
+    .finding-body { padding: 0 20px 20px; border-top: 1px solid var(--border); }
+    .finding-meta, .substatus {
+      display: inline-block;
+      margin: 12px 8px 0 0;
+      padding: 4px 9px;
+      color: var(--text);
+      background: #f5f7fa;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    dl { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 9px 18px; margin: 18px 0 0; }
+    dt, dd { margin: 0; }
+    pre, code { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+    pre { overflow-x: auto; padding: 14px; background: #f5f7fa; border: 1px solid var(--border); border-radius: 13px; white-space: pre-wrap; }
+    .coverage { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+    .note { margin: 12px 0 0; color: var(--muted); font-size: 13px; }
+    a { color: var(--accent); }
+    @media (max-width: 760px) {
+      main { width: calc(100% - 24px); margin: 12px auto; }
+      .inner { padding: 24px 18px; }
+      header { display: block; }
+      .meta { margin-top: 24px; }
+      .summary, .coverage { grid-template-columns: 1fr; }
+      dl { grid-template-columns: 1fr; gap: 4px; }
+      dd + dt { margin-top: 10px; }
+    }
+  </style>
+</head>
+<body>
+<main><div class="accent"></div><div class="inner">
+  <header><h1>Security Assessment Report</h1><div class="meta">
+    <div><b>Project</b><span>Demo Service</span></div>
+    <div><b>Generated</b><span>16 July 2026</span></div>
+    <div><b>Hunters run</b><span>businesslogic, idor, sqli</span></div>
+  </div></header>
+  <div class="summary"><div class="count">Confirmed<strong>1</strong></div><div class="count">Refuted<strong>2</strong></div><div class="count">Manual Review<strong>2</strong></div></div>
+  <section><h2>Confirmed</h2><details open><summary><span class="finding-title">Forced mode bypass</span></summary><div class="finding-body"><span class="finding-meta">businesslogic</span><span class="finding-meta">High</span><dl><dt>Location</dt><dd>src/mode.js:10</dd><dt>Challenge</dt><dd>Header presence bypasses the mode check.</dd><dt>Trace evidence</dt><dd>POST /mode → middleware → handler</dd><dt>Impact</dt><dd>An authenticated caller bypasses an operational control.</dd><dt>Remediation</dt><dd>Authorize the override and validate one canonical value.</dd></dl></div></details></section>
+  <section><h2>Refuted</h2><details><summary><span class="finding-title">Archive lookup exposure</span></summary><div class="finding-body"><span class="finding-meta">idor</span><dl><dt>Location</dt><dd>src/archive.js:40</dd><dt>Challenge</dt><dd>The repository method lacks ownership enforcement.</dd><dt>Trace evidence</dt><dd>No external route calls the archive method.</dd></dl></div></details>
+<details><summary><span class="finding-title">Report query interpolation</span></summary><div class="finding-body"><span class="finding-meta">sqli</span><dl><dt>Location</dt><dd>src/query.js:30</dd><dt>Challenge</dt><dd>The value uses a parameterized query.</dd></dl></div></details></section>
+  <section><h2>Manual Review</h2><details><summary><span class="finding-title">Order lookup lacks ownership</span></summary><div class="finding-body"><span class="finding-meta">idor</span><span class="finding-meta">High</span><span class="substatus">Runtime proof required</span><dl><dt>Location</dt><dd>src/orders.js:20</dd><dt>Challenge</dt><dd>The lookup accepts an arbitrary order identifier.</dd><dt>Trace evidence</dt><dd>Runtime gateway policy is outside this repository.</dd><dt>Impact</dt><dd>A caller may access another account&#39;s order.</dd><dt>Remediation</dt><dd>Enforce ownership at the lookup boundary.</dd><dt>Dynamic test</dt><dd>GET /orders/other-account-order with a normal user token</dd></dl></div></details>
+<details><summary><span class="finding-title">Deployment policy unknown</span></summary><div class="finding-body"><span class="finding-meta">businesslogic</span><span class="substatus">Defect determination required</span><dl><dt>Location</dt><dd>src/config.js:50</dd><dt>Challenge</dt><dd>The enforcing deployment policy is absent.</dd></dl></div></details></section>
+  <section><h2>Assessment Coverage</h2><div class="coverage"><div class="coverage-item">Source lines in scope<strong>120</strong></div><div class="coverage-item">Source files in scope<strong>4</strong></div><div class="coverage-item">Estimated source tokens<strong>120</strong></div></div><p class="note">Estimated source tokens are ceil(source bytes / 4), not model usage.</p></section>
+</div></main>
+</body>
+</html>

@@ -1,0 +1,91 @@
+{
+  "schemaVersion": 1,
+  "metadata": {
+    "project": "Demo Service",
+    "generatedDate": "2026-07-16",
+    "hunters": ["businesslogic", "idor", "sqli"]
+  },
+  "coverage": {
+    "sourceFiles": 4,
+    "sourceLines": 120,
+    "sourceBytes": 480,
+    "estimatedSourceTokens": 120
+  },
+  "findings": [
+    {
+      "id": "businesslogic@src/mode.js:10@9b2623dad8db",
+      "title": "Forced mode bypass",
+      "class": "businesslogic",
+      "path": "src/mode.js",
+      "line": 10,
+      "challengeVerdict": "DEFECT",
+      "challengeReason": "Header presence bypasses the mode check.",
+      "traceVerdict": "REACHABLE",
+      "traceEvidence": "POST /mode → middleware → handler",
+      "severity": "High",
+      "impact": "An authenticated caller bypasses an operational control.",
+      "remediation": "Authorize the override and validate one canonical value.",
+      "dynamicTest": null
+    },
+    {
+      "id": "idor@src/orders.js:20@067e17dbd170",
+      "title": "Order lookup lacks ownership",
+      "class": "idor",
+      "path": "src/orders.js",
+      "line": 20,
+      "challengeVerdict": "DEFECT",
+      "challengeReason": "The lookup accepts an arbitrary order identifier.",
+      "traceVerdict": "NEEDS-PROOF",
+      "traceEvidence": "Runtime gateway policy is outside this repository.",
+      "severity": "High",
+      "impact": "A caller may access another account's order.",
+      "remediation": "Enforce ownership at the lookup boundary.",
+      "dynamicTest": "GET /orders/other-account-order with a normal user token"
+    },
+    {
+      "id": "sqli@src/query.js:30@451cf057ec84",
+      "title": "Report query interpolation",
+      "class": "sqli",
+      "path": "src/query.js",
+      "line": 30,
+      "challengeVerdict": "NOT-A-DEFECT",
+      "challengeReason": "The value uses a parameterized query.",
+      "traceVerdict": null,
+      "traceEvidence": null,
+      "severity": null,
+      "impact": null,
+      "remediation": null,
+      "dynamicTest": null
+    },
+    {
+      "id": "idor@src/archive.js:40@b32981156965",
+      "title": "Archive lookup exposure",
+      "class": "idor",
+      "path": "src/archive.js",
+      "line": 40,
+      "challengeVerdict": "DEFECT",
+      "challengeReason": "The repository method lacks ownership enforcement.",
+      "traceVerdict": "UNREACHABLE",
+      "traceEvidence": "No external route calls the archive method.",
+      "severity": null,
+      "impact": null,
+      "remediation": null,
+      "dynamicTest": null
+    },
+    {
+      "id": "businesslogic@src/config.js:50@1d8c92905f35",
+      "title": "Deployment policy unknown",
+      "class": "businesslogic",
+      "path": "src/config.js",
+      "line": 50,
+      "challengeVerdict": "UNSURE",
+      "challengeReason": "The enforcing deployment policy is absent.",
+      "traceVerdict": null,
+      "traceEvidence": null,
+      "severity": null,
+      "impact": null,
+      "remediation": null,
+      "dynamicTest": null
+    }
+  ]
+}

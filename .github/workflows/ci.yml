@@ -1,0 +1,97 @@
+name: ci
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: tests (${{ matrix.os }}, node ${{ matrix.node }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            node: 22
+          - os: ubuntu-latest
+            node: 22
+          - os: windows-latest
+            node: 22
+          - os: ubuntu-latest
+            node: 24
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: ${{ matrix.node }}
+      # Windows runners provide Bash, so one loop covers all three platforms.
+      - name: Run the deterministic suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          for t in tests/*/*.test.mjs; do
+            echo "--- $t"
+            node "$t"
+          done
+
+  manifests:
+    name: manifest validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22
+
+      - name: Install Claude Code CLI
+        shell: bash
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Validate marketplace and plugins (Claude)
+        shell: bash
+        run: claude plugin validate . --strict
+
+      - name: Validate Codex marketplace manifest
+        shell: bash
+        run: |
+          jq -e '.name and (.plugins | length) > 0 and all(.plugins[]; .name and .source.path and .policy)' .agents/plugins/marketplace.json
+
+      - name: Check catalog plugin source paths exist
+        shell: bash
+        run: |
+          set -euo pipefail
+          status=0
+          while IFS= read -r src; do
+            if [ ! -d "$src" ]; then
+              echo "Claude catalog: plugin source directory does not exist: $src"
+              status=1
+            fi
+          done < <(jq -r '.plugins[].source' .claude-plugin/marketplace.json)
+          while IFS= read -r src; do
+            if [ ! -d "$src" ]; then
+              echo "Codex catalog: plugin source directory does not exist: $src"
+              status=1
+            fi
+          done < <(jq -r '.plugins[].source.path' .agents/plugins/marketplace.json)
+          exit "$status"
+
+      - name: Check per-plugin version consistency
+        shell: bash
+        run: |
+          for p in plugins/*/; do
+            c=$(jq -r .version "$p.claude-plugin/plugin.json")
+            x=$(jq -r .version "$p.codex-plugin/plugin.json")
+            if [ "$c" != "$x" ]; then
+              echo "version mismatch in $p: claude=$c codex=$x"
+              exit 1
+            fi
+          done

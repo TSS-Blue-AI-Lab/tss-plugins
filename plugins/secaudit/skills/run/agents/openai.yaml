@@ -1,0 +1,8 @@
+interface:
+  display_name: secaudit run
+  short_description: Launch the full secaudit source-code security audit (explicit-only).
+
+policy:
+  # A full secaudit spawns one agent per hunter plus challenge/trace fan-out and costs real
+  # money. Codex may only start it on an explicit $run mention, never on its own initiative.
+  allow_implicit_invocation: false
