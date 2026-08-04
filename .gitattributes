@@ -1,0 +1,14 @@
+# Deterministic bytes on every platform.
+#
+# Windows checkouts default to core.autocrlf=true, which would rewrite tracked LF files
+# to CRLF on checkout. Two properties here depend on the checked-out bytes:
+#
+#   1. The report templates are compared byte-for-byte against golden fixtures, and the
+#      renderer injects finding blocks joined with '\n'. A CRLF template therefore yields
+#      mixed-EOL output that matches no golden on any platform.
+#   2. The release ZIP hashes tracked file bytes, so a CRLF checkout produces a different
+#      package sha256 than the same commit built on Linux or macOS.
+#
+# Every tracked file in this repository is text and none contains CRLF, so pinning eol=lf
+# changes nothing in-repo — it only stops the checkout from introducing a platform variant.
+* text=auto eol=lf
