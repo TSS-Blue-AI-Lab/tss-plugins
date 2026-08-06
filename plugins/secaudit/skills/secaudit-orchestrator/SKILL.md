@@ -72,6 +72,18 @@ _The prep half of the Recon stage — the workflow folds these steps into Recon;
 3. All stages read/write inside `$WORK/sast/`.
 4. Start a running **ledger**: one line per stage event (Hunters chosen, batch size, Blindspot Sweep on/off, per-stage counts, retries) appended as the run progresses — Generate Artifacts' Publish step writes it verbatim into `run-ledger.json` / `trace.md`.
 
+## Make the stages visible (do this before stage 1)
+
+On Claude Code the workflow engine draws one progress group per stage. Running this runbook
+as prose there is no such display, so a seven-stage run collapses into one undifferentiated
+turn and the user cannot see where it is or where it failed. Before starting stage 1, register
+the stages as plan items with whatever planning tool your client provides (Codex: `update_plan`)
+— `Recon`, `Hunt`, `Challenge`, `Blindspot Sweep` (only if enabled), `Dedupe`, `Trace`,
+`Generate Artifacts` — and mark each one in progress when you enter it and complete when its
+artifact exists. If the client has no planning tool, print a `— stage N/7: <name> —` line
+instead. This is display only: it never changes the stage order, the fan-out, or the
+single-replay bound below.
+
 ## Stages (run in this order)
 1. **Recon** — run `sast-analysis` on `$WORK` → `sast/architecture.md` (+ `## Hunt Tasks`). Blocking.
 2. **Hunt** — one subagent per Hunter (`sast-<class>`) in parallel, each reading `architecture.md`, writing `sast/<class>-results.md` ending in `## Coverage`. Dead Hunters: retry once, then abort the run — never report on partial coverage (Reliability rules). Each Hunter runs its own skill's method INLINE (no nested subagents — this stage is already fanned out one per Hunter) and reports candidate findings with evidence and a `**Confidence:**` line only; it must NOT judge reachability or suppress uncertain findings (Challenge and Trace do that). (Dependency and vulnerability scanning of manifests/lockfiles is out of scope for this pipeline; run it as a separate standalone step afterward if needed.)
