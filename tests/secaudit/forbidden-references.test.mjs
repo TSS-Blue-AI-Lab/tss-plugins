@@ -10,7 +10,11 @@ const pluginRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'pl
 // prose (e.g. README's Layout section) is accurate documentation, not a leak. What must never
 // ship is the DIRECTORY itself, which this walk would already catch since it never runs against
 // a real .secaudit-local tree.
-const FORBIDDEN = ['.claude/skills', '.agents/skills', '.claude/commands', '.claude/workflows', '<private-client-identifier>']
+// A private client identifier was listed here while the plugin was imported from a corpus that
+// mentioned one. It is deliberately gone: a public test cannot enumerate the names it guards
+// against without publishing them. The shipped tree was verified clean of it before this repo
+// went public, and content is authored here now rather than imported.
+const FORBIDDEN = ['.claude/skills', '.agents/skills', '.claude/commands', '.claude/workflows']
 
 const walk = dir => readdirSync(dir).flatMap(name => {
   const p = join(dir, name)

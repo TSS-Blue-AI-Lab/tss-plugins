@@ -92,7 +92,9 @@ if ('workflows' in claudePlugin) {
 
 // The whole point of the canonical layout: no manifest may resurrect a retired path or leak a
 // developer's machine.
-const FORBIDDEN = ['.claude/skills', '.agents/skills', 'eval/', '<private-client-identifier>', '.secaudit-local', '/Users/', '..']
+// A private client identifier was listed here too; see forbidden-references.test.mjs for why a
+// public test does not enumerate it.
+const FORBIDDEN = ['.claude/skills', '.agents/skills', 'eval/', '.secaudit-local', '/Users/', '..']
 for (const [rel, reader] of [
   ['.claude-plugin/plugin.json', read],
   ['.codex-plugin/plugin.json', read],

@@ -1,0 +1,9 @@
+Third-party notices for tss-plugins
+===================================
+
+This repository is licensed under the MIT License (see LICENSE). Where a plugin derives
+from third-party work, its notice lives inside that plugin so it ships with every installed
+copy — an install contains only `plugins/<name>/`, never this repository root.
+
+- secaudit — derived in part from sast-skills (MIT, (c) 2026 Utku Sen):
+  see plugins/secaudit/NOTICE

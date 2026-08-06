@@ -37,7 +37,9 @@ assert.match(cmd, /launchToken/, 'launcher passes the workflow handshake token')
 assert.match(cmd, /node --version|Node\.js 22/i, 'launcher preflights the Node prerequisite')
 assert.match(cmd, /secaudit-runtime\.mjs"? inspect/, 'sniff is inspect-driven, not ad hoc find/wc')
 assert.match(cmd, /secaudit-runtime\.mjs"? prepare/, 'workspace comes from prepare, not improvised')
-assert.ok(!/<private-client-identifier>|eval\//.test(cmd), 'no corpus/eval paths in the packaged launcher')
+// A private client identifier was checked here too; see forbidden-references.test.mjs for why a
+// public test does not enumerate it.
+assert.ok(!/eval\//.test(cmd), 'no corpus/eval paths in the packaged launcher')
 
 const rb = readFileSync(join(root, 'skills/secaudit-orchestrator/SKILL.md'), 'utf8')
 // Orchestrator parity: no SCA/Trivy, loops described as optional/off-by-default.

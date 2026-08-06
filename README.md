@@ -48,6 +48,11 @@ for t in tests/*/*.test.mjs; do node "$t"; done
 Releases: bump `version` in the plugin's `.claude-plugin/plugin.json` AND
 `.codex-plugin/plugin.json` (must match), commit conventionally (`feat(secaudit): v0.2.0`).
 
+## Security
+
+Report a vulnerability privately — see [SECURITY.md](SECURITY.md). Please do not open a
+public issue for one.
+
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE). Third-party notices: [NOTICE](NOTICE).

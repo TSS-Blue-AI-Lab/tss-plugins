@@ -1,9 +1,10 @@
 # secaudit — agentic code-audit framework
 
 An installable plugin that runs a whitebox security audit of a source repository from inside a
-coding agent. Seeded from [sast-skills](https://github.com/utkusen/sast-skills) (MIT) and
-evolved in small versions; it implements the Cloudflare "Project Glasswing" vulnerability
-discovery harness as a single-repo pipeline.
+coding agent. Seeded from [sast-skills](https://github.com/utkusen/sast-skills) (MIT, © 2026
+Utku Sen — see [NOTICE](NOTICE)) and evolved in small versions; it implements the
+Cloudflare "Project Glasswing" vulnerability discovery harness as a single-repo pipeline. Not
+affiliated with or endorsed by Cloudflare.
 
 One canonical skill tree serves both supported clients. Claude Code drives it with a
 deterministic workflow; Codex drives the same skills with a portable prose runbook. Both share
@@ -135,6 +136,7 @@ What ships when you install the plugin:
 - `workflows/secaudit.js` — the deterministic Claude Code workflow spine
 - `.claude-plugin/plugin.json`, `.codex-plugin/plugin.json` — per-client plugin manifests
 - `README.md` — this file
+- `NOTICE` — third-party copyright notices, which must travel with every copy
 
 Nothing else is packaged: tests, docs, and CI config live in this repository but are not part
 of the plugin a user installs.
