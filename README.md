@@ -1,6 +1,6 @@
 # tss-plugins
 
-Public plugin marketplace by AI Lab Yonder. One canonical skill tree per plugin serves
+Public plugin marketplace by TSS Blue AI Lab. One canonical skill tree per plugin serves
 Claude Code, Codex (CLI + desktop app), and any agent that reads standard `SKILL.md`
 folders.
 

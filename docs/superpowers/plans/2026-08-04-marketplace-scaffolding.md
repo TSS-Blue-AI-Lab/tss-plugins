@@ -12,10 +12,10 @@
 
 ## Global Constraints
 
-- Marketplace name: `tss-plugins`; owner: `AI Lab Yonder` (GitHub org `AI-Lab-Yonder`).
+- Marketplace name: `tss-plugins`; owner: `TSS Blue AI Lab` (GitHub org `AI-Lab-Yonder`).
 - Plugin version: `0.1.0`, identical in `.claude-plugin/plugin.json` and `.codex-plugin/plugin.json`.
 - Never set `version` in marketplace plugin entries — plugin.json is the version authority.
-- License: plain MIT, © AI Lab Yonder, `"license": "MIT"` in manifests.
+- License: plain MIT, © TSS Blue AI Lab, `"license": "MIT"` in manifests.
 - Initial import copies dev-repo tracked files only; the dev repo's ROOT marketplace manifests (`.agents/plugins/marketplace.json`, `.claude-plugin/marketplace.json`) and `scripts/` are NOT copied. After import, this repo is the source of truth — development happens here.
 - Tests live at `tests/secaudit/`, never inside `plugins/` (plugin installs copy the whole plugin dir).
 - Not ported (packaging machinery, obsolete): `scripts/`, `tests/package-preflight.test.mjs`, `tests/package-release.test.mjs`, `tests/zip-roundtrip.test.mjs`, `tests/validate-repo-hygiene.test.mjs`.
@@ -40,7 +40,7 @@
 ```
 MIT License
 
-Copyright (c) 2026 AI Lab Yonder
+Copyright (c) 2026 TSS Blue AI Lab
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -74,7 +74,7 @@ node_modules/
 ```markdown
 # tss-plugins
 
-Public plugin marketplace by AI Lab Yonder. One canonical skill tree per plugin serves
+Public plugin marketplace by TSS Blue AI Lab. One canonical skill tree per plugin serves
 Claude Code, Codex (CLI + desktop app), and any agent that reads standard `SKILL.md`
 folders.
 
@@ -213,10 +213,10 @@ git commit -m "feat(secaudit): import v0.1.0 from security-scanning"
 {
   "name": "tss-plugins",
   "owner": {
-    "name": "AI Lab Yonder",
+    "name": "TSS Blue AI Lab",
     "url": "https://github.com/AI-Lab-Yonder"
   },
-  "description": "AI Lab Yonder public plugin marketplace.",
+  "description": "TSS Blue AI Lab public plugin marketplace.",
   "plugins": [
     {
       "name": "secaudit",

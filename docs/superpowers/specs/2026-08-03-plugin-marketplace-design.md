@@ -46,7 +46,7 @@ tss-plugins/
 │       └── ci.yml                # tests (OS×Node matrix) + manifest validation
 ├── .gitattributes                # `* text=auto eol=lf` — golden fixtures compare bytes
 ├── README.md                     # marketplace overview + per-agent install matrix
-└── LICENSE                       # plain MIT, © AI Lab Yonder
+└── LICENSE                       # plain MIT, © TSS Blue AI Lab
 ```
 
 ## Manifests
@@ -153,9 +153,9 @@ Job 2 — manifest validation (ubuntu):
 
 ### Decided
 
-1. Marketplace identity → name `tss-plugins`, owner `AI Lab Yonder` (org AI-Lab-Yonder).
+1. Marketplace identity → name `tss-plugins`, owner `TSS Blue AI Lab` (org AI-Lab-Yonder).
    Settles: install commands fixed; rules out repo rename and personal ownership.
-2. License → plain MIT, © AI Lab Yonder; `"license": "MIT"` in manifests. No NOTICE file;
+2. License → plain MIT, © TSS Blue AI Lab; `"license": "MIT"` in manifests. No NOTICE file;
    sast-skills credit stays in README.
 3. Fix routing → all plugin content changes via dev repo + re-release (see Edit policy).
 4. Going public → deferred, user's call; current work is local scaffolding. LICENSE/README

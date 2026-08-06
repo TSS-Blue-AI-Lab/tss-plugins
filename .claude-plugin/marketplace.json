@@ -1,10 +1,10 @@
 {
   "name": "tss-plugins",
   "owner": {
-    "name": "AI Lab Yonder",
+    "name": "TSS Blue AI Lab",
     "url": "https://github.com/AI-Lab-Yonder"
   },
-  "description": "AI Lab Yonder public plugin marketplace.",
+  "description": "TSS Blue AI Lab public plugin marketplace.",
   "plugins": [
     {
       "name": "secaudit",
