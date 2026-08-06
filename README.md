@@ -15,14 +15,14 @@ folders.
 ### Claude Code
 
 ```
-/plugin marketplace add AI-Lab-Yonder/tss-plugins
+/plugin marketplace add TSS-Blue-AI-Lab/tss-plugins
 /plugin install secaudit@tss-plugins
 ```
 
 ### Codex CLI
 
 ```
-codex plugin marketplace add AI-Lab-Yonder/tss-plugins
+codex plugin marketplace add TSS-Blue-AI-Lab/tss-plugins
 ```
 
 Then open `/plugins` and install `secaudit`.
@@ -32,7 +32,7 @@ Then open `/plugins` and install `secaudit`.
 No CLI needed — the app has a UI for this:
 
 1. Open **Plugins**, then **Create** → **Add Marketplace**, and add
-   `AI-Lab-Yonder/tss-plugins`.
+   `TSS-Blue-AI-Lab/tss-plugins`.
 2. Back in **Plugins**, open the **Personal** tab, find **secaudit** under
    **TSS Plugins**, and hit **Install**.
 

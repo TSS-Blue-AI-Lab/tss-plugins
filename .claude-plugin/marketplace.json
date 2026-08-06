@@ -2,7 +2,7 @@
   "name": "tss-plugins",
   "owner": {
     "name": "TSS Blue AI Lab",
-    "url": "https://github.com/AI-Lab-Yonder"
+    "url": "https://github.com/TSS-Blue-AI-Lab"
   },
   "description": "TSS Blue AI Lab public plugin marketplace.",
   "plugins": [
