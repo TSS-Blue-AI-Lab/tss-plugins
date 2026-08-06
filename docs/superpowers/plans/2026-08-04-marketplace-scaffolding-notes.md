@@ -1,7 +1,7 @@
 # Implementation Notes — Marketplace Scaffolding
 
-Execution of `docs/superpowers/plans/2026-08-04-marketplace-scaffolding.md`
-on branch `feat/marketplace-scaffolding` (base `b848a41`).
+Execution of `2026-08-04-marketplace-scaffolding.md` (this file's sibling)
+on branch `feat/marketplace-scaffolding` (base `b8b6e02`).
 
 ## Deviations
 
@@ -82,5 +82,5 @@ directory, so a subdirectory or non-Git tree can be audited on its own.
 - Deferred minors (cosmetic, tests pass): stale comment wording in
   `tests/secaudit/validate-explicit-only.test.mjs` and `validate-manifests.test.mjs` was
   corrected during the fix wave.
-- Unverified until the first real push: whether `claude plugin validate` runs
-  unauthenticated on a GitHub Actions runner. Everything else in CI was reproduced locally.
+- Resolved on the first real push: `claude plugin validate` does run unauthenticated on a
+  GitHub Actions runner. Everything else in CI had already been reproduced locally.
