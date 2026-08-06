@@ -75,14 +75,27 @@ _The prep half of the Recon stage — the workflow folds these steps into Recon;
 ## Make the stages visible (do this before stage 1)
 
 On Claude Code the workflow engine draws one progress group per stage. Running this runbook
-as prose there is no such display, so a seven-stage run collapses into one undifferentiated
-turn and the user cannot see where it is or where it failed. Before starting stage 1, register
-the stages as plan items with whatever planning tool your client provides (Codex: `update_plan`)
-— `Recon`, `Hunt`, `Challenge`, `Blindspot Sweep` (only if enabled), `Dedupe`, `Trace`,
-`Generate Artifacts` — and mark each one in progress when you enter it and complete when its
-artifact exists. If the client has no planning tool, print a `— stage N/7: <name> —` line
-instead. This is display only: it never changes the stage order, the fan-out, or the
-single-replay bound below.
+as prose there is no such display, so the whole run collapses into one undifferentiated turn
+and the user cannot see where it is or where it failed. Before starting stage 1, register the
+stages as plan items with whatever planning tool your client provides (Codex: `update_plan`),
+then mark each one in progress when you enter it and complete when its artifact exists.
+
+The Blindspot Sweep answer is already known here — it is settled in Recon / Prepare step 1,
+before stage 1 — so build the correct list up front rather than editing it mid-run:
+
+- **Sweep off (6 items):** `Recon`, `Hunt`, `Challenge`, `Dedupe`, `Trace`, `Generate Artifacts`.
+- **Sweep on (9 items):** the same, plus `Blindspot Sweep`, `Hunt (round 2)` and
+  `Challenge (round 2)` registered as their own items directly after `Blindspot Sweep`.
+
+Register the round-2 items rather than reopening the round-1 ones: a completed item flipped
+back to in-progress reads as a failed retry, not as the deliberate single replay it is. When
+the sweep finds no real gaps, close all three as skipped and go straight to `Dedupe` — an
+empty `blindspot-tasks.md` is a completed sweep, not a pending one.
+
+If the client has no planning tool, print a `— stage N/<total>: <name> —` line instead.
+
+This is display only: it never changes the stage order, the fan-out, or the single-replay
+bound below. The sweep still runs at most once whatever the plan shows.
 
 ## Stages (run in this order)
 1. **Recon** — run `sast-analysis` on `$WORK` → `sast/architecture.md` (+ `## Hunt Tasks`). Blocking.
