@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+# robin: inject the implementation-notes rule when a plan execution starts.
+#
+# Invoked as: notes-rule <EventName>   with the hook's JSON on stdin.
+#
+# Deliberately no `set -euo pipefail`: a non-matching grep is the normal
+# no-match path. Every path exits 0 and nothing is written to stderr — a
+# failing hook must never block a prompt.
+
+EVENT="${1:-}"
+input="$(cat 2>/dev/null)"
+
+json_string() { # $1 = key — greedy match means last occurrence wins; empty when absent
+    printf '%s' "$input" | sed -n "s/.*\"$1\" *: *\"\([^\"]*\)\".*/\1/p" | head -1
+}
+
+session="$(json_string session_id)"
+[ -n "$session" ] || session="unknown"
+
+cwd="$(json_string cwd)"
+[ -n "$cwd" ] || cwd="$PWD"
+
+# stdin-derived cwd first (may be JSON-escaped with doubled backslashes on
+# Windows, so git can fail on it); retry once with $PWD before giving up.
+branch="$(git -C "$cwd" rev-parse --abbrev-ref HEAD 2>/dev/null)"
+[ -n "$branch" ] || branch="$(git -C "$PWD" rev-parse --abbrev-ref HEAD 2>/dev/null)"
+branch="${branch//\//-}"
+[ -n "$branch" ] || branch="nobranch"
+
+tmp="${TMPDIR:-/tmp}"
+tmp="${tmp%/}"
+prefix="$tmp/robin-notes-rule-$session"
+marker="$prefix-$branch"
+
+case "$EVENT" in
+    UserPromptSubmit)
+        # This event exists for the typed slash command, which produces no
+        # Skill call — so match the slash form only. A bare mention is not a
+        # signal: prompts machine-generated from transcript history quote plan
+        # text naming both skills, and the model-invoked path such a prompt
+        # describes is already covered by PostToolUse. Probed: `prompt` holds
+        # the raw `/superpowers:executing-plans`, so the quote of the JSON
+        # field precedes the slash; `>` also allows the expanded
+        # `<command-name>/…</command-name>` shape. The prefix class is what
+        # stops a path like `skills/subagent-driven-development` matching.
+        printf '%s' "$input" |
+            grep -Eq '(^|[">[:space:]])/(superpowers:)?(subagent-driven-development|executing-plans)' || exit 0
+        [ -e "$marker" ] && exit 0
+        { : > "$marker"; } 2>/dev/null
+        ;;
+    PostToolUse)
+        # Strict: stdin carries the whole skill body in tool_response, and
+        # writing-plans names subagent-driven-development in its text. Only
+        # the skill input field decides.
+        printf '%s' "$input" |
+            grep -Eq '"skill" *: *"(superpowers:)?(subagent-driven-development|executing-plans)"' || exit 0
+        [ -e "$marker" ] && exit 0
+        { : > "$marker"; } 2>/dev/null
+        ;;
+    SessionStart)
+        # The compaction path: repeat the rule only for a session that
+        # already started a run. Compaction preserves session_id. Globbing
+        # the session prefix means a mid-session branch switch cannot hide
+        # the marker.
+        ls "$prefix"-* >/dev/null 2>&1 || exit 0
+        ;;
+    *)
+        exit 0
+        ;;
+esac
+
+# No double quotes and no backslashes other than the \n paragraph breaks, so
+# this drops into the JSON string below unescaped.
+RULE='Implementation notes (robin): while executing this plan, keep a notes file at `docs/superpowers/notes/<plan-basename>-notes.md` — the plan file basename plus `-notes` (plan `docs/superpowers/plans/2026-08-06-foo.md` becomes `docs/superpowers/notes/2026-08-06-foo-notes.md`). With no plan file, name it after the current branch: `docs/superpowers/notes/<branch>-notes.md`. Create it when the run starts, even if nothing has deviated yet: a `# Implementation Notes — <topic>` heading, the plan path, the branch, and an empty `## Deviations` section.\n\nIf an edge case forces you off the plan, pick the conservative option and log it under Deviations as `### D<N> — <short title>` with what the plan said, what you did instead, and why — then keep going. Do not stop to ask. Only the controller writes this file; subagents report deviations in their reports and the controller logs them. Commit it with the work. `robin:quiz-me` reads this file afterwards, so an entry too vague to quiz is an entry not worth writing.'
+
+printf '{"hookSpecificOutput":{"hookEventName":"%s","additionalContext":"%s"}}\n' "$EVENT" "$RULE"
+exit 0
