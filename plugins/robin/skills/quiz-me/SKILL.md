@@ -44,6 +44,10 @@ Collect, in this order:
 
 1. **The diff and the commit messages.** Commit messages carry intent the diff doesn't.
 2. **The implementation notes, if they exist** — `docs/superpowers/notes/<plan-basename>-notes.md`, or `<branch>-notes.md` when the work had no plan file. Deviations and decisions recorded during implementation are the highest-value material in the whole gather — they are exactly what a diff cannot show. Same for any plan or spec doc the change was built from.
+
+   **When there are no notes and no plan or spec, ask before building.** That material is the whole reason this skill beats reading the diff, so its absence is not a detail to work around quietly. Ask the user what the quiz should cover: which decisions were taken during implementation that the diff won't show, what they were unsure about, anything they specifically want tested. One question at a time, each carrying a recommended answer built from what the gather *did* find — the commit messages, the review output, the conversation — so they can accept it or write their own.
+
+   Only if they have nothing to add does the report proceed on the diff alone, and it says so in as many words. Building silently from the diff is a known failure of this skill, not a graceful degradation. Note also that the implementation-notes file is written by a Claude Code hook; on a harness with no hook system it never exists, so this branch is the normal path there rather than the exception.
 3. **Review output**, if a branch review or code review already ran in this session. Anything it flagged and the user accepted is a decision worth quizzing.
 4. **The conversation so far**, if the implementation happened in this session.
 

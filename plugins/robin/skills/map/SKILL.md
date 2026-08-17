@@ -20,7 +20,9 @@ Recommends only. Never invoke the skill you point at, never chain into it, and n
 
 ## During implementation
 
-Nothing yet.
+No skill to invoke — the **notes-rule hook** covers this slot, and only in Claude Code. When a plan execution starts, it injects one rule: keep `docs/superpowers/notes/<plan-basename>-notes.md`, and when an edge case forces a departure from the plan, take the conservative option, log it under `## Deviations`, and keep going. `quiz-me` reads those deviations afterwards.
+
+On a harness with no hook system nothing is injected and the notes file is the user's to keep by hand. If they ask what to do during implementation there, say that — and that `quiz-me` will ask them what to cover if the notes are missing.
 
 ## After implementation
 
