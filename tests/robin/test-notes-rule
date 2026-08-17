@@ -1,0 +1,161 @@
+#!/usr/bin/env bash
+# Checks for plugins/robin/hooks/notes-rule. Run: bash tests/robin/test-notes-rule
+# No framework by design — the hook ships with no dependencies, so neither does its test.
+# Lives here rather than beside the hook because an install copies only plugins/robin/.
+
+set -u
+
+REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+SCRIPT="$REPO_ROOT/plugins/robin/hooks/notes-rule"
+
+SCRATCH="$(mktemp -d)"
+trap 'rm -rf "$SCRATCH"' EXIT
+export TMPDIR="$SCRATCH"
+
+# Two scratch repos so branch-keyed markers can be told apart.
+make_repo() { # $1 = path, $2 = branch name
+    mkdir -p "$1"
+    git -C "$1" init -q
+    git -C "$1" checkout -q -b "$2" 2>/dev/null
+    git -C "$1" -c user.email=t@example.com -c user.name=t commit -q --allow-empty -m init
+}
+REPO_A="$SCRATCH/repo-a"; make_repo "$REPO_A" "feat/notes-hook"
+REPO_B="$SCRATCH/repo-b"; make_repo "$REPO_B" "feat/other"
+
+fails=0
+
+expect_injected() { # $1 = label, $2 = output
+    case "$2" in
+        *additionalContext*docs/superpowers/notes/*)
+            printf 'ok   %s\n' "$1" ;;
+        *)
+            printf 'FAIL %s — expected an injection, got: %s\n' "$1" "$2"; fails=$((fails + 1)); return ;;
+    esac
+    if command -v python3 >/dev/null 2>&1; then
+        if printf '%s' "$2" | python3 -m json.tool >/dev/null 2>&1; then
+            printf 'ok   %s (valid JSON)\n' "$1"
+        else
+            printf 'FAIL %s — output is not valid JSON: %s\n' "$1" "$2"; fails=$((fails + 1))
+        fi
+    else
+        printf 'skip %s (no python3 on PATH, JSON validity not checked)\n' "$1"
+    fi
+}
+
+expect_silent() { # $1 = label, $2 = output
+    if [ -z "$2" ]; then
+        printf 'ok   %s\n' "$1"
+    else
+        printf 'FAIL %s — expected no output, got: %s\n' "$1" "$2"; fails=$((fails + 1))
+    fi
+}
+
+expect_event() { # $1 = label, $2 = output, $3 = event name
+    case "$2" in
+        *"\"hookEventName\":\"$3\""*) printf 'ok   %s\n' "$1" ;;
+        *) printf 'FAIL %s — expected hookEventName %s, got: %s\n' "$1" "$3" "$2"; fails=$((fails + 1)) ;;
+    esac
+}
+
+run() { # $1 = event, $2 = json on stdin
+    printf '%s' "$2" | bash "$SCRIPT" "$1"
+}
+
+prompt_json() { # $1 = session, $2 = repo, $3 = prompt text
+    printf '{"session_id":"%s","cwd":"%s","hook_event_name":"UserPromptSubmit","prompt":"%s"}' "$1" "$2" "$3"
+}
+
+skill_json() { # $1 = session, $2 = repo, $3 = skill name, $4 = tool_response text
+    printf '{"session_id":"%s","cwd":"%s","hook_event_name":"PostToolUse","tool_name":"Skill","tool_input":{"skill":"%s"},"tool_response":"%s"}' "$1" "$2" "$3" "$4"
+}
+
+session_json() { # $1 = session, $2 = repo, $3 = source
+    printf '{"session_id":"%s","cwd":"%s","hook_event_name":"SessionStart","source":"%s"}' "$1" "$2" "$3"
+}
+
+# 1 — typed invocation injects
+out="$(run UserPromptSubmit "$(prompt_json s1 "$REPO_A" 'lets run /superpowers:subagent-driven-development on the plan')")"
+expect_injected "typed slash command injects" "$out"
+expect_event "typed injection names its event" "$out" "UserPromptSubmit"
+
+# 2 — model-invoked executing-plans injects
+out="$(run PostToolUse "$(skill_json s2 "$REPO_A" 'superpowers:executing-plans' 'plan execution skill body')")"
+expect_injected "model-invoked executing-plans injects" "$out"
+
+# 3 — a different skill whose body merely mentions SDD stays silent
+out="$(run PostToolUse "$(skill_json s3 "$REPO_A" 'superpowers:writing-plans' 'hand off to subagent-driven-development when done')")"
+expect_silent "writing-plans body mentioning SDD does not inject" "$out"
+
+# 4 — same session and branch twice: second is silent
+out="$(run UserPromptSubmit "$(prompt_json s4 "$REPO_A" '/superpowers:subagent-driven-development')")"
+expect_injected "first fire in a run injects" "$out"
+out="$(run UserPromptSubmit "$(prompt_json s4 "$REPO_A" 'continue /superpowers:subagent-driven-development')")"
+expect_silent "second fire in the same run is deduped" "$out"
+
+# 5 — SessionStart with no marker for this session stays silent
+out="$(run SessionStart "$(session_json s5 "$REPO_A" compact)")"
+expect_silent "SessionStart without a marker does not inject" "$out"
+
+# 6 — SessionStart after a marker exists re-injects (the compaction path)
+out="$(run SessionStart "$(session_json s4 "$REPO_A" compact)")"
+expect_injected "SessionStart re-injects for a session mid-run" "$out"
+expect_event "re-injection names its event" "$out" "SessionStart"
+
+# 7 — same session, different branch: marker key differs, so it injects
+out="$(run UserPromptSubmit "$(prompt_json s4 "$REPO_B" '/superpowers:subagent-driven-development')")"
+expect_injected "second plan on a new branch injects again" "$out"
+
+# 8 — unrelated prompt stays silent
+out="$(run UserPromptSubmit "$(prompt_json s6 "$REPO_A" 'what does this repo do')")"
+expect_silent "unrelated prompt does not inject" "$out"
+
+# 9 — unknown event stays silent
+out="$(run PreToolUse "$(prompt_json s7 "$REPO_A" 'run subagent-driven-development')")"
+expect_silent "unknown event does not inject" "$out"
+
+# 10 — broken input still exits 0 and says nothing
+out="$(run UserPromptSubmit 'not json at all')"
+expect_silent "unparseable input does not inject" "$out"
+printf 'not json at all' | bash "$SCRIPT" UserPromptSubmit >/dev/null 2>&1
+if [ $? -eq 0 ]; then printf 'ok   broken input still exits 0\n'; else printf 'FAIL broken input exited non-zero\n'; fails=$((fails + 1)); fi
+
+# 11 — read-only TMPDIR (marker write fails): stderr stays empty, exit stays 0
+RO_DIR="$SCRATCH/readonly"
+mkdir -p "$RO_DIR"
+chmod 500 "$RO_DIR"
+stderr_file="$SCRATCH/ro-stderr"
+TMPDIR="$RO_DIR" bash "$SCRIPT" UserPromptSubmit \
+    <<<"$(prompt_json s8 "$REPO_A" '/superpowers:subagent-driven-development')" \
+    >/dev/null 2>"$stderr_file"
+ro_status=$?
+chmod u+w "$RO_DIR"
+ro_stderr="$(cat "$stderr_file")"
+if [ -z "$ro_stderr" ] && [ "$ro_status" -eq 0 ]; then
+    printf 'ok   read-only TMPDIR: stderr empty and exit 0\n'
+else
+    printf 'FAIL read-only TMPDIR — exit=%s stderr=%s\n' "$ro_status" "$ro_stderr"; fails=$((fails + 1))
+fi
+
+# 12 — a prompt that merely quotes the skill names stays silent. Observed live:
+# the continuous-learning hook feeds transcript history back as a prompt, and
+# that history quotes plan headers naming both skills. Six injections in
+# tss-invoice-engine came from this, none of them a real run.
+out="$(run UserPromptSubmit "$(prompt_json s9 "$REPO_A" 'REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan')")"
+expect_silent "quoted skill names without the slash form do not inject" "$out"
+
+# 13 — a skill path in the prompt is not an invocation either
+out="$(run UserPromptSubmit "$(prompt_json s10 "$REPO_A" 'read superpowers/6.2.0/skills/subagent-driven-development/SKILL.md')")"
+expect_silent "a skill path does not inject" "$out"
+
+# 14 — the expanded slash-command shape injects too. A probe shows `prompt`
+# carries the raw `/superpowers:executing-plans`, but the transcript records
+# the command expanded; matching both keeps the hook working either way.
+out="$(run UserPromptSubmit "$(prompt_json s11 "$REPO_A" '<command-name>/superpowers:subagent-driven-development</command-name>')")"
+expect_injected "expanded slash-command shape injects" "$out"
+
+if [ "$fails" -eq 0 ]; then
+    printf '\nall checks passed\n'
+    exit 0
+fi
+printf '\n%s check(s) failed\n' "$fails"
+exit 1
