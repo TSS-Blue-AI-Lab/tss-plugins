@@ -19,16 +19,17 @@ const claudePlugin = readJson('.claude-plugin/plugin.json')
 const claudeMarket = readRepoJson('.claude-plugin/marketplace.json')
 const codexPlugin = readJson('.codex-plugin/plugin.json')
 const codexMarket = readRepoJson('.agents/plugins/marketplace.json')
-const codexEntry = codexMarket.plugins[0]
+// Looked up by name, not index: the catalogs list every plugin in this repo, and their order is
+// not this plugin's business.
+const claudeEntry = claudeMarket.plugins.find(p => p.name === PLUGIN_NAME)
+const codexEntry = codexMarket.plugins.find(p => p.name === PLUGIN_NAME)
 
 // Identity agrees across every manifest. A mismatch means one client installs a differently
 // named plugin, which silently breaks the `secaudit:run` invocation name.
 assert.equal(claudePlugin.name, PLUGIN_NAME, 'Claude plugin name')
 assert.equal(codexPlugin.name, PLUGIN_NAME, 'Codex plugin name')
-assert.equal(claudeMarket.plugins.length, 1, 'Claude marketplace lists exactly one plugin')
-assert.equal(claudeMarket.plugins[0].name, PLUGIN_NAME, 'Claude marketplace entry name')
-assert.equal(codexMarket.plugins.length, 1, 'Codex marketplace lists exactly one plugin')
-assert.equal(codexMarket.plugins[0].name, PLUGIN_NAME, 'Codex marketplace entry name')
+assert.ok(claudeEntry, 'Claude marketplace lists this plugin')
+assert.ok(codexEntry, 'Codex marketplace lists this plugin')
 
 // Version agreement is the safety net for manual version bumps (spec decision 8). In this repo
 // plugin.json is the sole version authority (global constraint — the root marketplace catalogs
@@ -37,7 +38,7 @@ assert.equal(codexMarket.plugins[0].name, PLUGIN_NAME, 'Codex marketplace entry 
 const versions = [claudePlugin.version, codexPlugin.version]
 for (const v of versions) assert.match(v, /^\d+\.\d+\.\d+$/, `semver syntax: ${v}`)
 assert.equal(new Set(versions).size, 1, `both plugin manifests declare one version, got ${versions.join(', ')}`)
-assert.ok(!('version' in claudeMarket.plugins[0]), 'Claude marketplace entry does not duplicate version (plugin.json is authority)')
+assert.ok(!('version' in claudeEntry), 'Claude marketplace entry does not duplicate version (plugin.json is authority)')
 assert.ok(!('version' in codexEntry), 'Codex marketplace entry does not duplicate version (plugin.json is authority)')
 
 // Required fields per vendor schema.
@@ -53,8 +54,8 @@ assert.ok(
 assert.ok(codexEntry.policy?.authentication, 'Codex policy.authentication is set (required)')
 
 // This plugin lives under plugins/secaudit, not at the marketplace root — the marketplace hosts
-// (potentially) more than one plugin, so each catalog entry points at the plugin's subdirectory.
-assert.equal(claudeMarket.plugins[0].source, './plugins/secaudit', 'Claude marketplace source points at the plugin subdirectory')
+// more than one plugin, so each catalog entry points at the plugin's subdirectory.
+assert.equal(claudeEntry.source, './plugins/secaudit', 'Claude marketplace source points at the plugin subdirectory')
 assert.equal(codexEntry.source?.source, 'local', 'Codex marketplace source kind')
 assert.equal(codexEntry.source?.path, './plugins/secaudit', 'Codex marketplace source path points at the plugin subdirectory')
 
