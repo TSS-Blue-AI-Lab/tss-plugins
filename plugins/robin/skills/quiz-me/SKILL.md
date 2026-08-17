@@ -55,6 +55,8 @@ For each changed entry point, trace what it now does *through code the diff did 
 
 Dispatch read-only research subagents in parallel, one per changed subsystem or per entry point when the change is narrow. Use a read-only or explore-type agent if the harness provides one, otherwise a general-purpose agent. Each brief names one changed thing and asks for the surrounding machinery, with `file:line` evidence.
 
+If the harness cannot dispatch subagents, trace the subsystems one at a time in this session instead. Do not skip the phase or narrow it to the diff — this is where most of the value is, and a serial trace is slower but not worse.
+
 Look specifically for:
 
 - Behaviour that changed in a file the diff never mentions.

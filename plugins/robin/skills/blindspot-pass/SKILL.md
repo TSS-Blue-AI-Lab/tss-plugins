@@ -49,9 +49,13 @@ These answers set the floor. Never report as a blind spot something the user jus
 
 Dispatch five parallel read-only research subagents, one per angle. Use a read-only or explore-type agent if the harness provides one, otherwise a general-purpose agent. `BOTH` runs both sets — ten agents.
 
+If the harness cannot dispatch subagents at all, work the angles one at a time in this session and say so in the report. Every angle still gets run — but the separation that keeps each investigator blind to what the others found is gone, so the returns will converge more than they should. Name that in the report, because the user cannot see it from the output.
+
 Read `references/investigation-angles.md` for the angles and the brief each agent gets.
 
 `DOMAIN` angles start from web research every time, including for subjects that feel stable. The user is asking precisely because they cannot tell which parts of their intuition are out of date.
+
+If the harness has no web access, **say so before reporting anything** and mark every `DOMAIN` finding `[ASK A HUMAN]`. Answering from your own memory is the exact failure this skill exists to prevent: the output looks identical to a researched pass, so nothing warns the user that what they got was a snapshot of your training data. Not all harnesses have web search on by default — check rather than assume.
 
 ## Phase 3 — Synthesize and filter
 
