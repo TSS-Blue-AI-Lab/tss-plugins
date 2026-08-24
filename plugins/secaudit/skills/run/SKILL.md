@@ -48,11 +48,18 @@ node "<PLUGIN_ROOT>/skills/run/scripts/secaudit-runtime.mjs" inspect --target <r
 
 Omit `--target` entirely when the user gave no path — the runtime resolves the Git
 toplevel above the current directory, else the current directory. Parse the one-line
-JSON: `{target, targetSource, coverage, extensions, manifests, exclusionsApplied, warnings, …}`.
-On `{"error":{code,message}}`, report the message and stop.
+JSON: `{target, targetSource, artifactRoot, artifactRootSource, coverage, extensions, manifests,
+exclusionsApplied, warnings, …}`. On `{"error":{code,message}}`, report the message and stop.
 
 **Show the resolved `target` to the user before anything else** — they must see what
 would be audited. Surface any `warnings` verbatim.
+
+**Show where the report will be written**: `<artifactRoot>/.secaudit/runs/`. The run directory
+follows the PROJECT root, not the audited tree — `artifactRootSource` says which one it found:
+`targetGitRoot` (the audited tree's own repository), `cwdGitRoot` (the audited tree is in no
+repository, so the run follows the one you are standing in — this is what keeps an audit of a
+staged or copied workspace out of that copy), or `target` (nothing is a repository). When it is
+not the target, say so plainly; the user can override the exact directory with `--output`.
 
 `targetSource` says how that path was arrived at: `explicit` (the user named it), `gitToplevel`
 (guessed by walking up from the current directory to the nearest repository root), or `cwd`
@@ -140,9 +147,10 @@ JSON (and the user's `--output` if they gave one):
 node "<PLUGIN_ROOT>/skills/run/scripts/secaudit-runtime.mjs" prepare --target <target> [--output <exact-run-directory>]
 ```
 
-Parse its one-line JSON: `{runId, runDir, work, target, coverage, corpusSha256,
+Parse its one-line JSON: `{runId, runDir, work, target, artifactRoot, coverage, corpusSha256,
 generatedDate, …}`. On `{"error":{code,message}}`, report the message and stop — never
-improvise a workspace.
+improvise a workspace. **Print the resolved `runDir`** before launching: it is where every
+artifact of this run will appear, and the only chance to redirect it is now.
 
 Call the workflow with the chosen config, passing the prepare fields through verbatim. The
 `hunters:` argument is MANDATORY — substitute the user's selected classes as a literal array
@@ -198,9 +206,9 @@ stop and re-launch with the correct `hunters:` array.
 
 When the workflow finishes, report to the user: counts of CONFIRMED / REFUTED / MANUAL REVIEW,
 the top 3 CONFIRMED findings, and the paths to `<runDir>/report.md`, `<runDir>/report.html`,
-and `<runDir>/trace.md`. Remind the user the run directory is ephemeral — git-ignored whenever
-it sits inside the audited repo, and holding a full copy of that repo including its `.env` —
-so copy out anything worth keeping and delete it when done. Never claim the codebase is "secure."
+and `<runDir>/trace.md`. Remind the user the run directory is ephemeral — it ignores its own
+contents wherever it sits in a working tree, and holds a full copy of the audited tree including
+its `.env` — so copy out anything worth keeping and delete it when done. Never claim the codebase is "secure."
 
 **Fallback (no Workflow engine, e.g. Codex):** follow
 `<PLUGIN_ROOT>/skills/secaudit-orchestrator/SKILL.md` stage-by-stage instead.

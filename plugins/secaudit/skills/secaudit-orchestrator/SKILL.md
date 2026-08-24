@@ -45,8 +45,13 @@ Inspect the target to ground the Hunter recommendation and cost estimate:
 - Run the deterministic inspection (read-only, never writes to the target):
   `node "<PLUGIN_ROOT>/skills/run/scripts/secaudit-runtime.mjs" inspect --target "<target>"` — omit
   `--target` when the user gave no path (the runtime resolves the Git toplevel, else the
-  invocation directory). Parse its one-line JSON `{target, targetSource, coverage, extensions,
-  manifests, warnings, …}` and show the resolved `target` to the user.
+  invocation directory). Parse its one-line JSON `{target, targetSource, artifactRoot,
+  artifactRootSource, coverage, extensions, manifests, warnings, …}`, show the resolved `target`
+  to the user, and surface any `warnings` verbatim.
+- **Say where the report will land**: `<artifactRoot>/.secaudit/runs/`. The run directory follows
+  the PROJECT root, not the audited tree — the audited tree's own repository, else the repository
+  you are standing in (which is what keeps an audit of a staged or copied workspace out of that
+  copy), else the target. Point it elsewhere with `--output`.
 - **A guessed target must be confirmed before anything is written.** `targetSource` is
   `explicit` (user named it), `gitToplevel` (walked up to the nearest repository root) or `cwd`.
   A guess can be wider than intended — invoked from `repo/services/api` it audits all of `repo`
@@ -65,7 +70,8 @@ _The prep half of the Recon stage — the workflow folds these steps into Recon;
 2. Prepare the isolated run with the deterministic runtime (validation, hashing, run
    directory, ownership marker, isolated copy — one command, no manual `cp`):
    `node "<PLUGIN_ROOT>/skills/run/scripts/secaudit-runtime.mjs" prepare --target "<target>" [--output "<exact-run-directory>"]`
-   Parse its one-line JSON and set `WORK=<work>`, `RUNDIR=<runDir>`; keep `coverage`,
+   Parse its one-line JSON and set `WORK=<work>`, `RUNDIR=<runDir>` — print `RUNDIR`, it is
+   where every artifact of this run appears — and keep `coverage`,
    `corpusSha256`, and `generatedDate` unchanged for Generate Artifacts at the end of the
    run. On `{"error":{code,message}}`, report the message and stop — never improvise a
    workspace, and never write the original corpus tree.

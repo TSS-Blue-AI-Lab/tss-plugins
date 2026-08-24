@@ -89,22 +89,28 @@ copy, and re-hashes before publishing. If the source changed mid-audit, publicat
 One run writes exactly one directory:
 
 ```
-<target>/.secaudit/runs/<run-id>/
+<project-root>/.secaudit/runs/<run-id>/
 ├── report.md          # findings, buckets, counts
 ├── report.html         # the same report, rendered
 ├── trace.md            # corpus hash, coverage, template version, stage ledger
 └── work/sast/          # retained evidence: per-Hunter results, deduped set, report data
 ```
 
+The project root is the audited tree's own Git toplevel; if the audited tree is in no
+repository — a staged or copied workspace, say — it is the Git toplevel above your current
+directory, so the report lands in the repository you are working in rather than in the copy;
+failing both, it is the target. `--output` overrides the choice entirely. The launcher prints
+the resolved location before any spend.
+
 `<run-id>` is a UTC timestamp plus the first eight characters of the source hash. Every run
-directory inside the target carries its own `.gitignore`, so no run — default or `--output` —
-makes a clean target repository look dirty. That matters beyond tidiness: the work tree is a
+directory inside a working tree carries its own `.gitignore`, so no run — default or `--output` —
+makes a clean repository look dirty. That matters beyond tidiness: the work tree is a
 verbatim copy of the target including dotfiles, so an unignored run directory puts real
 `.env` secrets one `git add -A` from a commit.
 
 Run directories are **ephemeral by design**: they are git-ignored, and deleting the checkout
 deletes the audit history with it. Copy out anything worth keeping. Deleting
-`<target>/.secaudit/runs/<run-id>/` is safe at any time — that is how you reclaim disk.
+`<project-root>/.secaudit/runs/<run-id>/` is safe at any time — that is how you reclaim disk.
 
 `--output` overrides the exact run directory, not just its parent. Paths that would make the
 isolated copy contain itself, that contain the target, or that point at a non-empty directory

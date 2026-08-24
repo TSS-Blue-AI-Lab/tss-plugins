@@ -82,12 +82,31 @@ export async function writeMarker(dir, fields) {
   return marker
 }
 
+// Where a default run directory belongs: the PROJECT root, not the corpus root. Auditing a
+// staged copy of a repository is a supported workflow, and a run directory that follows the
+// corpus lands the report inside a throwaway copy — where the operator never looks and the
+// next cleanup deletes it. First hit wins:
+//   1. the audited tree's own repository root  — the ordinary case, unchanged behaviour;
+//   2. the repository the operator is standing in — a stripped copy has no .git, so this is
+//      what catches the staged-copy case;
+//   3. the target itself — nothing is a repository, so there is no better answer.
+export async function resolveArtifactRoot(target, cwd) {
+  const fromTarget = findGitToplevel(target)
+  if (fromTarget) return { artifactRoot: await realpath(fromTarget), artifactRootSource: 'targetGitRoot' }
+  const fromCwd = findGitToplevel(cwd)
+  if (fromCwd) return { artifactRoot: await realpath(fromCwd), artifactRootSource: 'cwdGitRoot' }
+  return { artifactRoot: target, artifactRootSource: 'target' }
+}
+
 // Validate the requested run directory (or pick the default) against the canonical target.
-export async function selectRunDir(target, requested, runId) {
+// `artifactRoot` is resolveArtifactRoot()'s answer and only governs the default; it defaults
+// to the target so a caller that does not care keeps the historical layout.
+export async function selectRunDir(target, requested, runId, artifactRoot = target) {
   if (!requested) {
+    const runDir = join(artifactRoot, '.secaudit', 'runs', runId)
     return {
-      runDir: join(target, '.secaudit', 'runs', runId),
-      insideTarget: true,
+      runDir,
+      insideTarget: runDir.startsWith(target + sep),
       isDefault: true,
     }
   }

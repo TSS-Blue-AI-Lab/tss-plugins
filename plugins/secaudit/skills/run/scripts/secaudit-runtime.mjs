@@ -7,7 +7,7 @@ import { existsSync } from 'node:fs'
 import { extname, join, dirname, sep, isAbsolute, relative, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { enumerateSource, measureSource, EXCLUDED_DIR_NAMES, hashSource } from './source-corpus.mjs'
-import { RuntimeError, resolveTarget, targetSource, makeRunId, selectRunDir, writeMarker, canonicalizePlanned } from './run-paths.mjs'
+import { RuntimeError, resolveTarget, targetSource, makeRunId, selectRunDir, writeMarker, canonicalizePlanned, resolveArtifactRoot, findGitToplevel } from './run-paths.mjs'
 
 const USAGE = `Usage:
   node secaudit-runtime.mjs inspect --target <path>
@@ -16,7 +16,11 @@ const USAGE = `Usage:
 inspect is read-only: it reports source measurements, recognized manifests, and
 the exclusions that would apply, and never writes to the target.
 prepare validates, hashes, creates the run directory + ownership marker, and
-copies the source into an isolated work tree.
+copies the source into an isolated work tree. Without --output the run directory
+defaults to <project-root>/.secaudit/runs/<run-id>, where project root is the
+target's own Git toplevel, else the Git toplevel above the current directory
+(so auditing a staged copy still reports into the real repository), else the
+target itself.
 
 Results: one JSON line on stdout. Diagnostics: stderr.
 Failure: exit 1 with {"error":{"code","message"}} on stdout. Codes:
@@ -71,6 +75,7 @@ function isManifest(rel) {
 
 export async function inspect(options) {
   const target = await resolveTarget(options.target, process.cwd())
+  const { artifactRoot, artifactRootSource } = await resolveArtifactRoot(target, process.cwd())
   const { files, internalSymlinks, externalSymlinks, excludedDirsHit, excludedRunDirs } =
     await enumerateSource(target)
   const coverage = await measureSource(target, files)
@@ -83,6 +88,17 @@ export async function inspect(options) {
   // to miss: the SKILL surfaces `warnings` verbatim, so it goes there and not only in an array.
   const warnings = []
   if (coverage.sourceFiles === 0) warnings.push('no recognized source files under target')
+  // The report follows the project, not the corpus — say so BEFORE the spend, because this is
+  // the one thing about a run the operator cannot discover afterwards by looking in the repo.
+  if (artifactRoot !== target) {
+    warnings.push('reports will be written to ' + join(artifactRoot, '.secaudit', 'runs')
+      + ', outside the audited tree ('
+      + (artifactRootSource === 'cwdGitRoot'
+        ? 'the target is not in a Git working tree, so the run follows the repository you are '
+          + 'standing in — this is what keeps a staged-copy audit out of the copy'
+        : 'the target sits inside that repository')
+      + '); pass --output to place them somewhere else')
+  }
   if (excludedRunDirs.length > 0) {
     warnings.push('CORPUS INTEGRITY: ' + undeclaredRunDirMessage(excludedRunDirs)
       + ' (each holds a secaudit-run.json marker); prepare will refuse until then')
@@ -90,6 +106,8 @@ export async function inspect(options) {
   return {
     target,
     targetSource: targetSource(options.target, process.cwd()),
+    artifactRoot,
+    artifactRootSource,
     coverage,
     extensions,
     manifests: files.filter(isManifest),
@@ -154,6 +172,7 @@ async function copyWorkTree(target, files, symlinkPlan, work) {
 
 export async function prepare(options) {
   const target = await resolveTarget(options.target, process.cwd())
+  const { artifactRoot, artifactRootSource } = await resolveArtifactRoot(target, process.cwd())
   const extraExcluded = []
   if (options.output) {
     const planned = await canonicalizePlanned(options.output)
@@ -171,17 +190,18 @@ export async function prepare(options) {
     [...internalSymlinks, ...externalSymlinks])
   const nowIso = new Date().toISOString()
   const generatedDate = nowIso.slice(0, 10)
-  const runsDefault = join(target, '.secaudit', 'runs')
+  const runsDefault = join(artifactRoot, '.secaudit', 'runs')
   const runId = makeRunId(nowIso, corpusSha256.slice(0, 8),
     id => existsSync(join(runsDefault, id)))
-  const { runDir, insideTarget } = await selectRunDir(target, options.output, runId)
+  const { runDir, insideTarget } = await selectRunDir(target, options.output, runId, artifactRoot)
   const work = join(runDir, 'work')
   const symlinkPlan = await planInternalSymlinks(target, internalSymlinks, work)
   await mkdir(runDir, { recursive: true })
-  if (insideTarget) {
+  if (insideTarget || findGitToplevel(runDir)) {
     // The work tree copies the target's dotfiles verbatim, secrets included, so a run directory
-    // git can see is one `git add -A` from committing them. Every in-target run directory ignores
-    // its own contents — a user-supplied --output inside the target is not the safe case.
+    // git can see is one `git add -A` from committing them. Any run directory inside a working
+    // tree ignores its own contents — including the default one, which now follows the project
+    // root and so routinely lands in a repository that is not the target.
     await writeFile(join(runDir, '.gitignore'), '*\n', 'utf8')
   }
   await writeMarker(runDir, { runId, target, createdUtc: nowIso, state: 'preparing' })
@@ -192,6 +212,8 @@ export async function prepare(options) {
     createdUtc: nowIso,
     state: 'prepared',
     insideTarget,
+    artifactRoot,
+    artifactRootSource,
     coverage,
     corpusSha256,
     skippedExternalSymlinks: externalSymlinks,
@@ -205,6 +227,8 @@ export async function prepare(options) {
     corpusSha256,
     generatedDate,
     insideTarget,
+    artifactRoot,
+    artifactRootSource,
     skippedExternalSymlinks: externalSymlinks,
     excludedRunDirs,
     internalSymlinks,

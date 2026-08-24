@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import assert from 'node:assert'
 import {
-  resolveTarget, findGitToplevel, makeRunId, selectRunDir,
+  resolveTarget, findGitToplevel, makeRunId, selectRunDir, resolveArtifactRoot,
   writeMarker, readMarker,
 } from '../../plugins/secaudit/skills/run/scripts/run-paths.mjs'
 
@@ -43,6 +43,31 @@ const picked = await selectRunDir(target, null, id)
 assert.deepStrictEqual(picked, {
   runDir: join(target, '.secaudit', 'runs', id), insideTarget: true, isDefault: true,
 })
+
+// resolveArtifactRoot: the DEFAULT run directory follows the project root, not the corpus root.
+// A target inside a repository reports to that repository, from anywhere.
+assert.deepStrictEqual(await resolveArtifactRoot(join(target, 'src'), plainSub),
+  { artifactRoot: target, artifactRootSource: 'targetGitRoot' })
+// Guarded, because an ancestor of tmpdir having a .git would make these two cases coincide.
+if (!findGitToplevel(plainSub)) {
+  // The staged-copy case: the copy is in no repository, so the run follows the one the operator
+  // is standing in. Without this the report lands in the copy and is thrown away with it.
+  assert.deepStrictEqual(await resolveArtifactRoot(plainSub, join(target, 'src')),
+    { artifactRoot: target, artifactRootSource: 'cwdGitRoot' })
+  // Nothing is a repository → the target, i.e. the historical layout.
+  assert.deepStrictEqual(await resolveArtifactRoot(plainSub, plainSub),
+    { artifactRoot: plainSub, artifactRootSource: 'target' })
+}
+
+// selectRunDir applies the artifact root to the default path only, and reports honestly that
+// the run directory then sits outside the audited tree.
+const rooted = await selectRunDir(plainSub, null, id, target)
+assert.deepStrictEqual(rooted, {
+  runDir: join(target, '.secaudit', 'runs', id), insideTarget: false, isDefault: true,
+})
+// An explicit --output still wins over the artifact root.
+const overridden = await selectRunDir(plainSub, join(base, 'explicit', 'run'), id, target)
+assert.strictEqual(overridden.runDir, join(base, 'explicit', 'run'))
 
 // Rejections, each with its stable code.
 await assert.rejects(selectRunDir(target, target, id), err => err.code === 'E_OUTPUT_IS_TARGET')

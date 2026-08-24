@@ -80,7 +80,10 @@ function makeWork(runDir) {
   const trace = readFileSync(join(runDir, 'trace.md'), 'utf8')
   assert.match(trace, /pristine/i)
   assert.match(trace, /"stage": "report"/, 'trace.md must include ledger contents')
-  assert.match(trace, /sourceFiles|Source files/i, 'trace.md must include coverage metrics')
+  assert.strictEqual(trace.split('\n')[3], '- Target: ' + await realpath(target),
+  'trace.md must name the tree the corpus hash was taken over — the run directory follows the '
+  + 'project root, so it is not necessarily inside what was audited')
+assert.match(trace, /sourceFiles|Source files/i, 'trace.md must include coverage metrics')
   assert.match(trace, /version/i, 'trace.md must include template version')
   assert.deepStrictEqual(readdirSync(work), ['sast'], 'work must only contain sast after publish')
 

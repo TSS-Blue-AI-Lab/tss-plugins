@@ -26,11 +26,12 @@ async function requireFile(path, label) {
   if (!st || !st.isFile()) throw new Error('publish-artifacts: ' + label + ' is missing or not a file: ' + path)
 }
 
-function buildTraceMd({ ledger, coverage, templateVersion, corpusSha256 }) {
+function buildTraceMd({ ledger, coverage, templateVersion, corpusSha256, target }) {
   return [
     '# Publish Trace',
     '',
     '## Corpus',
+    '- Target: ' + target,
     '- Pristine: true',
     '- sha256: ' + corpusSha256,
     '',
@@ -143,8 +144,11 @@ export async function publishArtifacts(options) {
   const summary = summaryFor(reportData.findings)
   const finalMd = await readFile(finalMdPath, 'utf8')
   const finalHtml = await readFile(finalHtmlPath, 'utf8')
+  // The run directory follows the project root, so it is not necessarily inside what was
+  // audited: the trace has to name the tree the hash was taken over.
   const traceMd = buildTraceMd({
     ledger, coverage: reportData.coverage, templateVersion, corpusSha256: actualCorpusSha256,
+    target: canonicalTarget,
   })
 
   await atomicWrite(join(runDir, 'report.md'), finalMd)

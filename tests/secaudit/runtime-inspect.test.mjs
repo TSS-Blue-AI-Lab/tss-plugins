@@ -29,7 +29,11 @@ assert.strictEqual(out.extensions['.js'], 1)
 assert.strictEqual(out.extensions['.json'], 1)
 assert.deepStrictEqual(out.exclusionsApplied, ['node_modules'])
 assert.ok(Array.isArray(out.exclusionPolicy) && out.exclusionPolicy.includes('.secaudit'))
-assert.deepStrictEqual(out.warnings, [])
+// The artifact-root notice depends on where the process is standing, which says nothing about
+// the corpus; every "no findings" warning assertion below filters it out and it gets its own
+// dedicated case further down.
+const corpusWarnings = w => w.filter(x => !x.startsWith('reports will be written to'))
+assert.deepStrictEqual(corpusWarnings(out.warnings), [])
 
 // How the target was arrived at, so the SKILL can tell "the user named this path" apart from
 // "the runtime guessed it" and only gate the guess behind a confirmation.
@@ -72,7 +76,8 @@ const emptyTarget = realpathSync.native(mkdtempSync(join(tmpdir(), 'secaudit-emp
 writeFileSync(join(emptyTarget, 'README.rst'), 'docs only', 'utf8')
 const emptyOut = JSON.parse(
   execFileSync('node', [cli, 'inspect', '--target', emptyTarget]).toString('utf8'))
-assert.deepStrictEqual(emptyOut.warnings, ['no recognized source files under target'])
+assert.deepStrictEqual(corpusWarnings(emptyOut.warnings),
+  ['no recognized source files under target'])
 
 // An undeclared secaudit run marker hides a whole subtree from the audit. inspect is
 // read-only reconnaissance so it stays exit 0, but the anomaly must be impossible to miss:
@@ -106,5 +111,26 @@ try {
 } catch (err) { badFlag = err }
 assert.strictEqual(JSON.parse(badFlag.stdout.toString('utf8')).error.code, 'E_USAGE')
 assert.match(execFileSync('node', [cli, 'inspect', '--help']).toString('utf8'), /Usage:/)
+
+// Where the report will land is the one thing about a run that cannot be discovered afterwards
+// by looking in the repository, so inspect reports it before any spend. A target that is its own
+// repository keeps everything inside itself and says nothing.
+const ownRepo = JSON.parse(
+  execFileSync('node', [cli, 'inspect', '--target', repo], { cwd: repo }).toString('utf8'))
+assert.strictEqual(ownRepo.artifactRoot, repo)
+assert.strictEqual(ownRepo.artifactRootSource, 'targetGitRoot')
+assert.ok(!ownRepo.warnings.some(w => w.startsWith('reports will be written to')))
+
+// A staged copy is in no repository, so the run follows the repository the operator is standing
+// in — and that redirection has to be visible up front.
+const stagedCopy = realpathSync.native(mkdtempSync(join(tmpdir(), 'secaudit-staged-')))
+writeFileSync(join(stagedCopy, 'app.js'), 'let x = 1\n', 'utf8')
+const stagedOut = JSON.parse(
+  execFileSync('node', [cli, 'inspect', '--target', stagedCopy], { cwd: repo }).toString('utf8'))
+assert.strictEqual(stagedOut.artifactRoot, repo)
+assert.strictEqual(stagedOut.artifactRootSource, 'cwdGitRoot')
+assert.ok(stagedOut.warnings.some(w => w.includes(join(repo, '.secaudit', 'runs'))),
+  'inspect must name the run directory when it lands outside the audited tree, got: '
+  + JSON.stringify(stagedOut.warnings))
 
 console.log('PASS runtime-inspect')
