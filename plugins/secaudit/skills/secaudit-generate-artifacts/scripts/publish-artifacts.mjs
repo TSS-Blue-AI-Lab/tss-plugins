@@ -11,6 +11,7 @@ import { pathToFileURL } from 'node:url'
 import { validateReportData, summaryFor } from './report-contract.mjs'
 import { enumerateSource, hashSource } from '../../run/scripts/source-corpus.mjs'
 import { readMarker, updateMarker, MARKER_NAME } from '../../run/scripts/run-paths.mjs'
+import { computeAnchor, fingerprintFor } from '../../issues/scripts/fingerprint.mjs'
 
 function requireNonEmptyString(value, label) {
   if (typeof value !== 'string' || value.length === 0) {
@@ -72,6 +73,32 @@ async function pruneWorkExceptSast(work) {
   }
   const remaining = (await readdir(work)).sort()
   return { removed: removed.sort(), remaining, ok: remaining.every(name => name === 'sast') }
+}
+
+// Anchors are computed HERE, and only here, because this is the last moment the copied source
+// exists: the next statement prunes it, and the target itself may change the minute we finish.
+// A finding whose file is missing from the copy (scoped out, or a path the model invented) is
+// left without an anchor rather than anchored to a guess — import treats it as legacy identity.
+export async function annotateAnchors(reportData, work) {
+  const findings = []
+  for (const finding of reportData.findings) {
+    const sourceText = await readFile(join(work, ...finding.path.split('/')), 'utf8')
+      .catch(() => null)
+    if (sourceText == null) {
+      findings.push({ ...finding, anchor: null })
+      continue
+    }
+    const anchor = computeAnchor({ sourceText, line: finding.line, path: finding.path })
+    findings.push({
+      ...finding,
+      anchor: {
+        version: 1,
+        ...anchor,
+        fingerprint: fingerprintFor({ class: finding.class, path: finding.path, ...anchor }),
+      },
+    })
+  }
+  return { ...reportData, findings }
 }
 
 export async function publishArtifacts(options) {
@@ -153,6 +180,10 @@ export async function publishArtifacts(options) {
   })
 
   await atomicWrite(join(runDir, 'trace.md'), traceMd)
+
+  const anchored = await annotateAnchors(reportData, work)
+  validateReportData(anchored)
+  await atomicWrite(reportDataPath, JSON.stringify(anchored, null, 2) + '\n')
 
   const publishedUtc = new Date().toISOString()
   await updateMarker(runDir, {

@@ -76,6 +76,18 @@ function validateFinding(finding, seenIds) {
   seenIds.add(finding.id)
   requireValue(finding.id === findingId(finding), 'finding.id does not match findingId(finding): ' + finding.id)
 
+  // Optional: historical report-data.json predates anchors, and a finding whose source file
+  // was not in the copy is published without one. Present but malformed is still a hard error.
+  if (finding.anchor !== undefined && finding.anchor !== null) {
+    const a = finding.anchor
+    requireValue(a && typeof a === 'object', 'finding.anchor must be an object when present')
+    requireValue(a.version === 1, 'finding.anchor.version must be 1')
+    requireValue(['decl', 'file'].includes(a.anchorKind), 'finding.anchor.anchorKind is invalid: ' + a.anchorKind)
+    requireValue(nonEmpty(a.anchorName), 'finding.anchor.anchorName is required')
+    requireValue(/^[0-9a-f]{16}$/.test(a.codeHash), 'finding.anchor.codeHash must be 16 lowercase hex characters')
+    requireValue(/^fp1:[0-9a-f]{24}$/.test(a.fingerprint), 'finding.anchor.fingerprint must be fp1:<24 hex>')
+  }
+
   const { challengeVerdict, traceVerdict } = finding
   requireValue(
     ['DEFECT', 'NOT-A-DEFECT', 'UNSURE'].includes(challengeVerdict),

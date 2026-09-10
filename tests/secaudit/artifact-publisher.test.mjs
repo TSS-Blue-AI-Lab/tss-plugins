@@ -46,6 +46,14 @@ function populateWork(work) {
   mkdirSync(sastDir)
   writeFileSync(join(sastDir, 'report-data.json'), JSON.stringify(reportData), 'utf8')
   writeFileSync(join(sastDir, 'run-ledger.json'), JSON.stringify({ stage: 'report', status: 'complete' }), 'utf8')
+  // The copied source the findings point at. Anchors are computed against this tree at publish
+  // time, so a work tree without it exercises the wrong path.
+  mkdirSync(join(work, 'src'), { recursive: true })
+  for (const finding of reportData.findings) {
+    const lines = Array.from({ length: finding.line }, (_, i) => 'const filler' + i + ' = ' + i)
+    lines[finding.line - 1] = 'export function handler' + finding.line + '(req) { sink(req.q) }'
+    writeFileSync(join(work, ...finding.path.split('/')), lines.join('\n') + '\n', 'utf8')
+  }
   // Scratch left over from earlier stages; must be pruned on success, left alone on rejection.
   mkdirSync(join(work, 'scratch'))
   writeFileSync(join(work, 'scratch', 'debug.log'), 'debug', 'utf8')
@@ -123,7 +131,7 @@ assert.match(trace, /sourceFiles|Source files/i, 'trace.md must include coverage
     /corpus not pristine/,
   )
 
-  assert.deepStrictEqual(readdirSync(work).sort(), ['sast', 'scratch'], 'work must be untouched on rejection')
+  assert.deepStrictEqual(readdirSync(work).sort(), ['sast', 'scratch', 'src'], 'work must be untouched on rejection')
   assert.ok(!existsSync(join(runDir, 'report.md')), 'report.md must not be copied on rejection')
   assert.ok(!existsSync(join(runDir, 'report.html')), 'report.html must not be copied on rejection')
   assert.ok(!existsSync(join(runDir, 'trace.md')), 'trace.md must not be written on rejection')
@@ -138,7 +146,7 @@ assert.match(trace, /sourceFiles|Source files/i, 'trace.md must include coverage
     () => publishArtifacts({ target, expectedCorpusSha256: 'not-a-hash', work, runDir, ledgerPath: join(work, 'sast', 'run-ledger.json') }),
     /expectedCorpusSha256/,
   )
-  assert.deepStrictEqual(readdirSync(work).sort(), ['sast', 'scratch'], 'invalid input must not mutate work')
+  assert.deepStrictEqual(readdirSync(work).sort(), ['sast', 'scratch', 'src'], 'invalid input must not mutate work')
 }
 
 // --- CLI: flags map correctly and print one JSON summary line ---
@@ -233,7 +241,7 @@ assert.match(trace, /sourceFiles|Source files/i, 'trace.md must include coverage
   assert.ok(!existsSync(join(runDir, 'report.md')), 'no report.md on a pruned-corpus abort')
   assert.ok(!existsSync(join(runDir, 'report.html')), 'no report.html on a pruned-corpus abort')
   assert.ok(!existsSync(join(runDir, 'trace.md')), 'no pristine claim on a pruned-corpus abort')
-  assert.deepStrictEqual(readdirSync(work).sort(), ['sast', 'scratch'],
+  assert.deepStrictEqual(readdirSync(work).sort(), ['sast', 'scratch', 'src'],
     'work must be untouched on a pruned-corpus abort')
 }
 
@@ -264,7 +272,7 @@ assert.match(trace, /sourceFiles|Source files/i, 'trace.md must include coverage
       /corpus not pristine/,
     )
     assert.ok(!existsSync(join(runDir, 'trace.md')), 'no pristine claim after symlink tampering')
-    assert.deepStrictEqual(readdirSync(work).sort(), ['sast', 'scratch'])
+    assert.deepStrictEqual(readdirSync(work).sort(), ['sast', 'scratch', 'src'])
   }
 }
 
@@ -315,6 +323,30 @@ assert.match(trace, /sourceFiles|Source files/i, 'trace.md must include coverage
   assert.ok(!existsSync(join(fixture.runDir, 'trace.md')))
 
   console.log('artifact-publisher aborts without advancing state: ok')
+}
+
+// --- anchors are persisted before the source copy is pruned ----------------
+{
+  const fixture = await makeRun()   // its work tree still holds the copied source
+  await publishArtifacts({
+    target: fixture.target,
+    expectedCorpusSha256: fixture.corpus,
+    work: fixture.work,
+    runDir: fixture.runDir,
+    ledgerPath: fixture.ledgerPath,
+  })
+
+  const published = JSON.parse(
+    readFileSync(join(fixture.work, 'sast', 'report-data.json'), 'utf8'))
+  for (const finding of published.findings) {
+    assert.equal(finding.anchor.version, 1)
+    assert.ok(finding.anchor.fingerprint.startsWith('fp1:'))
+    assert.equal(finding.anchor.codeHash.length, 16)
+  }
+  // The source copy is gone, but the anchors survived it.
+  assert.deepEqual(readdirSync(fixture.work), ['sast'])
+
+  console.log('artifact-publisher anchors: ok')
 }
 
 console.log('PASS artifact-publisher')
