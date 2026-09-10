@@ -35,7 +35,9 @@ const expectedCorpusSha256 = await corpusHash(target)
 // --- run directory carrying the secaudit ownership marker, as `prepare` would have written it ---
 const runDir = mkdtempSync(join(tmpdir(), 'secaudit-rundir-'))
 writeFileSync(join(runDir, 'secaudit-run.json'),
-  JSON.stringify({ marker: 'secaudit-run', formatVersion: 1, runId: 'integration-run' }), 'utf8')
+  JSON.stringify({
+    marker: 'secaudit-run', formatVersion: 2, runId: 'integration-run', state: 'prepared',
+  }), 'utf8')
 
 // --- the run directory's own work/sast tree, seeded with the assembled report-data.json ---
 const work = join(runDir, 'work')
@@ -66,11 +68,11 @@ const output = execFileSync('node', [
 ]).toString('utf8').trim()
 const lastStdoutLine = output.split('\n').filter(Boolean).pop()
 
-assert.deepStrictEqual(JSON.parse(lastStdoutLine), {
-  confirmed: 1,
-  refuted: 2,
-  manualReview: 2,
-})
+const published = JSON.parse(lastStdoutLine)
+assert.deepStrictEqual(
+  { confirmed: published.confirmed, refuted: published.refuted, manualReview: published.manualReview },
+  { confirmed: 1, refuted: 2, manualReview: 2 })
+assert.strictEqual(published.state, 'complete', 'the run records that it published and cleaned up')
 assert.ok(existsSync(join(runDir, 'trace.md')), 'trace.md')
 assert.ok(existsSync(join(work, 'sast', 'report-data.json')))
 for (const name of ['report.md', 'report.html']) {

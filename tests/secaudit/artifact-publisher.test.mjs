@@ -36,7 +36,7 @@ function makeRunDir({ withMarker = true } = {}) {
   const runDir = mkdtempSync(join(tmpdir(), 'secaudit-rundir-'))
   if (withMarker) {
     writeFileSync(join(runDir, 'secaudit-run.json'),
-      JSON.stringify({ marker: 'secaudit-run', formatVersion: 1, runId: 'test-run' }), 'utf8')
+      JSON.stringify({ marker: 'secaudit-run', formatVersion: 2, runId: 'test-run', state: 'prepared' }), 'utf8')
   }
   return runDir
 }
@@ -59,6 +59,18 @@ function makeWork(runDir) {
   return work
 }
 
+// A complete, publishable run: pristine target, marked run directory, populated work tree.
+async function makeRun() {
+  const target = makeTarget()
+  const runDir = makeRunDir()
+  const work = makeWork(runDir)
+  return {
+    target, runDir, work,
+    ledgerPath: join(work, 'sast', 'run-ledger.json'),
+    corpus: await corpusHash(target),
+  }
+}
+
 // --- Success path ---
 {
   const target = makeTarget()
@@ -71,7 +83,9 @@ function makeWork(runDir) {
     target, expectedCorpusSha256, work, runDir, ledgerPath,
   })
 
-  assert.deepStrictEqual(summary, { confirmed: 1, refuted: 2, manualReview: 2 })
+  assert.deepStrictEqual(
+    { confirmed: summary.confirmed, refuted: summary.refuted, manualReview: summary.manualReview },
+    { confirmed: 1, refuted: 2, manualReview: 2 })
   // Provenance and structured findings, and nothing else.
   assert.ok(existsSync(join(runDir, 'trace.md')), 'trace.md must be written')
   assert.ok(existsSync(join(work, 'sast', 'report-data.json')), 'report-data.json must survive the prune')
@@ -142,7 +156,10 @@ assert.match(trace, /sourceFiles|Source files/i, 'trace.md must include coverage
     '--run-dir', runDir,
     '--ledger', ledgerPath,
   ]).toString('utf8').trim()
-  assert.deepStrictEqual(JSON.parse(output), { confirmed: 1, refuted: 2, manualReview: 2 })
+  const cliResult = JSON.parse(output)
+  assert.deepStrictEqual(
+    { confirmed: cliResult.confirmed, refuted: cliResult.refuted, manualReview: cliResult.manualReview },
+    { confirmed: 1, refuted: 2, manualReview: 2 })
   assert.ok(existsSync(join(runDir, 'trace.md')))
 }
 
@@ -152,7 +169,7 @@ assert.match(trace, /sourceFiles|Source files/i, 'trace.md must include coverage
   const runDir = join(target, '.secaudit', 'runs', 'r1')
   mkdirSync(runDir, { recursive: true })
   writeFileSync(join(runDir, 'secaudit-run.json'),
-    JSON.stringify({ marker: 'secaudit-run', formatVersion: 1, runId: 'r1' }), 'utf8')
+    JSON.stringify({ marker: 'secaudit-run', formatVersion: 2, runId: 'r1', state: 'prepared' }), 'utf8')
   const work = makeWork(runDir)
   const ledgerPath = join(work, 'sast', 'run-ledger.json')
   const expectedCorpusSha256 = await corpusHash(target) // marker dir auto-skipped → hash of sources only
@@ -249,6 +266,55 @@ assert.match(trace, /sourceFiles|Source files/i, 'trace.md must include coverage
     assert.ok(!existsSync(join(runDir, 'trace.md')), 'no pristine claim after symlink tampering')
     assert.deepStrictEqual(readdirSync(work).sort(), ['sast', 'scratch'])
   }
+}
+
+// --- lifecycle + cleanup accounting ----------------------------------------
+{
+  const fixture = await makeRun()
+  writeFileSync(join(fixture.work, 'leftover-source.py'), 'x = 1\n', 'utf8')
+
+  const summary = await publishArtifacts({
+    target: fixture.target,
+    expectedCorpusSha256: fixture.corpus,
+    work: fixture.work,
+    runDir: fixture.runDir,
+    ledgerPath: fixture.ledgerPath,
+  })
+
+  assert.equal(summary.state, 'complete')
+  assert.ok(summary.cleanup.ok)
+  assert.ok(summary.cleanup.removed.includes('leftover-source.py'))
+  assert.deepEqual(summary.cleanup.remaining, ['sast'])
+  assert.ok(!existsSync(join(fixture.work, 'leftover-source.py')))
+  assert.ok(existsSync(join(fixture.work, 'sast', 'report-data.json')))
+
+  const marker = JSON.parse(readFileSync(join(fixture.runDir, 'secaudit-run.json'), 'utf8'))
+  assert.equal(marker.state, 'complete')
+  assert.equal(typeof marker.publishedUtc, 'string')
+  assert.deepEqual(marker.artifacts, ['trace.md'])
+  assert.equal(marker.cleanup.ok, true)
+
+  console.log('artifact-publisher lifecycle: ok')
+}
+
+// --- a non-pristine corpus leaves the marker untouched ----------------------
+{
+  const fixture = await makeRun()
+  writeFileSync(join(fixture.target, 'app.py'), 'mutated = 1\n', 'utf8')
+
+  await assert.rejects(publishArtifacts({
+    target: fixture.target,
+    expectedCorpusSha256: fixture.corpus,
+    work: fixture.work,
+    runDir: fixture.runDir,
+    ledgerPath: fixture.ledgerPath,
+  }), /corpus not pristine/)
+
+  const marker = JSON.parse(readFileSync(join(fixture.runDir, 'secaudit-run.json'), 'utf8'))
+  assert.equal(marker.state, 'prepared')       // never advanced
+  assert.ok(!existsSync(join(fixture.runDir, 'trace.md')))
+
+  console.log('artifact-publisher aborts without advancing state: ok')
 }
 
 console.log('PASS artifact-publisher')

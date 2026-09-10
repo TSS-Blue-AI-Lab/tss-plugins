@@ -10,7 +10,7 @@ import { join, sep, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { validateReportData, summaryFor } from './report-contract.mjs'
 import { enumerateSource, hashSource } from '../../run/scripts/source-corpus.mjs'
-import { readMarker, MARKER_NAME } from '../../run/scripts/run-paths.mjs'
+import { readMarker, updateMarker, MARKER_NAME } from '../../run/scripts/run-paths.mjs'
 
 function requireNonEmptyString(value, label) {
   if (typeof value !== 'string' || value.length === 0) {
@@ -60,12 +60,18 @@ async function atomicWrite(path, content) {
   await rename(tmpPath, path)
 }
 
+// The copied source is temporary: it is removed on success and only the audit evidence stays.
+// Returning the accounting (rather than nothing) is what lets the run refuse to claim success
+// when a leftover survives — an operator who is told "clean" must actually be clean.
 async function pruneWorkExceptSast(work) {
-  const entries = await readdir(work, { withFileTypes: true })
-  for (const entry of entries) {
+  const removed = []
+  for (const entry of await readdir(work, { withFileTypes: true })) {
     if (entry.name === 'sast') continue
     await rm(join(work, entry.name), { recursive: true, force: true })
+    removed.push(entry.name)
   }
+  const remaining = (await readdir(work)).sort()
+  return { removed: removed.sort(), remaining, ok: remaining.every(name => name === 'sast') }
 }
 
 export async function publishArtifacts(options) {
@@ -139,7 +145,6 @@ export async function publishArtifacts(options) {
 
   // --- 3. Pristine: copy artifacts via .tmp siblings, rename only after each
   //        write succeeds, THEN prune the work tree. ---
-  const summary = summaryFor(reportData.findings)
   // The run directory follows the project root, so it is not necessarily inside what was
   // audited: the trace has to name the tree the hash was taken over.
   const traceMd = buildTraceMd({
@@ -149,9 +154,18 @@ export async function publishArtifacts(options) {
 
   await atomicWrite(join(runDir, 'trace.md'), traceMd)
 
-  await pruneWorkExceptSast(work)
+  const publishedUtc = new Date().toISOString()
+  await updateMarker(runDir, {
+    state: 'published',
+    publishedUtc,
+    artifacts: ['trace.md'],
+  })
 
-  return summary
+  const cleanup = await pruneWorkExceptSast(work)
+  const state = cleanup.ok ? 'complete' : 'cleanup-incomplete'
+  await updateMarker(runDir, { state, cleanup })
+
+  return { ...summaryFor(reportData.findings), state, cleanup }
 }
 
 function parseArgs(argv) {
@@ -174,7 +188,15 @@ function parseArgs(argv) {
 const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href
 if (isMain) {
   publishArtifacts(parseArgs(process.argv.slice(2)))
-    .then(summary => console.log(JSON.stringify(summary)))
+    .then(result => {
+      console.log(JSON.stringify(result))
+      if (!result.cleanup.ok) {
+        console.error('publish-artifacts: the copied source was NOT fully removed; these entries '
+          + 'remain under the work tree: ' + result.cleanup.remaining.join(', ')
+          + ' — the run is recorded as cleanup-incomplete, delete them by hand')
+        process.exitCode = 1
+      }
+    })
     .catch(err => {
       console.error(err.message)
       process.exitCode = 1
