@@ -225,7 +225,8 @@ export async function prepare(options) {
   const runsDefault = join(artifactRoot, '.secaudit', 'runs')
   const runId = makeRunId(nowIso, corpusSha256.slice(0, 8),
     id => existsSync(join(runsDefault, id)))
-  const { runDir, insideTarget } = await selectRunDir(target, options.output, runId, artifactRoot)
+  const { runDir, insideTarget, isDefault: isDefaultRunDir } =
+    await selectRunDir(target, options.output, runId, artifactRoot)
   const work = join(runDir, 'work')
   const symlinkPlan = await planInternalSymlinks(target, internalSymlinks, work)
   await mkdir(runDir, { recursive: true })
@@ -253,6 +254,13 @@ export async function prepare(options) {
     corpusSha256,
     skippedExternalSymlinks: externalSymlinks,
   })
+  // A default run lives under <projectRoot>/.secaudit/runs and is rediscoverable by walking the
+  // filesystem. An explicitly placed one is not — if it is not indexed now, the dashboard will
+  // never learn it existed.
+  if (!isDefaultRunDir) {
+    const { registerRun } = await import('../../issues/scripts/run-catalog.mjs')
+    await registerRun(artifactRoot, { runId, runDir })
+  }
   return {
     runId,
     runDir,

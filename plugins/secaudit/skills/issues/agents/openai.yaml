@@ -1,0 +1,9 @@
+interface:
+  display_name: secaudit issues
+  short_description: Open the secaudit Workbench issue board locally (explicit-only).
+
+policy:
+  # This starts a long-lived local HTTP server bound to loopback and serving the project's
+  # audit findings. Starting or stopping a server is the operator's call, never the model's
+  # own initiative, so it takes an explicit $issues mention.
+  allow_implicit_invocation: false

@@ -85,8 +85,15 @@ const prep3 = JSON.parse(execFileSync('node',
   [cli, 'prepare', '--target', cleanTarget, '--output', outDir], { cwd: cleanTarget }).toString('utf8'))
 assert.strictEqual(prep3.runDir, outDir)
 assert.ok(existsSync(join(outDir, 'work', 'a.go')))
-assert.ok(!existsSync(join(cleanTarget, '.secaudit')),
-  'explicit external output must leave the target untouched')
+// Nothing of the RUN lands in the target: no run directory, no work tree, no source touched.
+// The one thing that does is the catalog index — an externally placed run is not rediscoverable
+// by walking the filesystem, so the project has to record that it exists or the dashboard never
+// learns about it. `.secaudit/` is excluded from the corpus, so the audited source is unchanged.
+assert.ok(!existsSync(join(cleanTarget, '.secaudit', 'runs')),
+  'explicit external output must place no run directory in the target')
+assert.deepStrictEqual(readdirSync(join(cleanTarget, '.secaudit')).sort(),
+  ['.gitignore', 'catalog.json'])
+assert.strictEqual(readFileSync(join(cleanTarget, 'a.go'), 'utf8'), 'package main\n')
 assert.strictEqual(prep3.insideTarget, false)
 assert.ok(!existsSync(join(outDir, '.gitignore')),
   'an output outside the target is nobody\'s working tree: no ignore file is written there')
