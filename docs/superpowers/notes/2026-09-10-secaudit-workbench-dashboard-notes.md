@@ -54,3 +54,22 @@ fact on screen the audit never recorded.
 The prototype's header shows a project name. Nothing in the store carries one, so
 `GET /api/board` now returns `projectName` (the basename of the resolved project root) and the
 header renders that.
+
+### D8 — Persistence e2e second run is dated relative to now
+
+The plan's e2e test stamps the reopening run `2026-02-01T00:00:00Z`, but the human "done" move
+before it is stamped with the server's own clock (today). `attach()` deliberately only reopens
+when the run STARTED after the human decision, so the fixed past date made `reopened` 0. The
+run is now dated one day after the transition, which is what the assertion was actually
+testing.
+
+### D9 — The manual visual parity pass could not be run in this environment
+
+Task 6 requires a side-by-side visual comparison in a browser. Headless Chrome
+(`/Applications/Google Chrome.app`) hangs before producing a screenshot here, and there is no
+other browser or automation driver installed, so the visual half of the verification is
+OUTSTANDING and must be done by a human against `output/secaudit-workbench.html`. What was
+verified instead: the parity test's measurements and security properties, that every asset
+(page, CSS, module, fonts, licence) is served with the right content type and a strict CSP,
+and that the rebuilt stylesheet is the prototype's own rules with only the `fieldnotes` theme
+and the inlined fonts removed.

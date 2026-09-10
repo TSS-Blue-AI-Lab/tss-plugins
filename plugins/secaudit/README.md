@@ -124,6 +124,26 @@ while the target, project root, and corpus hash keep referring to the real repos
 isolated copy contain itself, that contain the target, or that point at a non-empty directory
 secaudit does not own are rejected before anything is copied.
 
+## The Workbench
+
+`/secaudit:issues [project-path]` opens the triage board. It first syncs the persistent issue
+store with every run it can discover in the project, then serves the board locally:
+
+```
+node "<plugin>/skills/issues/scripts/server.mjs" --project "<project>"
+{"url":"http://127.0.0.1:53129"}
+```
+
+The server binds to `127.0.0.1` only, serves one project, and stops with Ctrl-C. The board
+itself is a static page — no build step, no CDN, no network at runtime; IBM Plex ships with it.
+
+Decisions live in `<project-root>/.secaudit/issues.json` and are the only thing that moves a
+card. Findings are matched across runs by a code anchor rather than by title or line number, so
+the same defect stays one card as the file changes around it. A finding marked a false positive
+is archived and suppressed at publication time in every later run until someone restores it; a
+finding that simply stops appearing is never marked done, because scope and coverage differ
+between runs. Nothing done on the board changes a historical run's report.
+
 ## Limitations
 
 - **Concurrent runs against one target are unsupported.** Run identifiers do not collide, but
