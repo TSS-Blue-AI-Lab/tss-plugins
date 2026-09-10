@@ -10,8 +10,8 @@ import { enumerateSource, measureSource, EXCLUDED_DIR_NAMES, hashSource } from '
 import { RuntimeError, resolveTarget, targetSource, makeRunId, selectRunDir, writeMarker, canonicalizePlanned, resolveArtifactRoot, findGitToplevel } from './run-paths.mjs'
 
 const USAGE = `Usage:
-  node secaudit-runtime.mjs inspect --target <path>
-  node secaudit-runtime.mjs prepare --target <path> [--output <exact-run-directory>]
+  node secaudit-runtime.mjs inspect --target <path> [--scope <relative-path>]...
+  node secaudit-runtime.mjs prepare --target <path> [--output <exact-run-directory>] [--scope <relative-path>]...
 
 inspect is read-only: it reports source measurements, recognized manifests, and
 the exclusions that would apply, and never writes to the target.
@@ -21,13 +21,16 @@ defaults to <project-root>/.secaudit/runs/<run-id>, where project root is the
 target's own Git toplevel, else the Git toplevel above the current directory
 (so auditing a staged copy still reports into the real repository), else the
 target itself.
+--scope restricts WHAT IS READ to the given target-relative paths (repeatable,
+or one comma-separated value). The target, project root, and corpus hash still
+refer to the real repository, so a partial audit never needs a staged copy.
 
 Results: one JSON line on stdout. Diagnostics: stderr.
 Failure: exit 1 with {"error":{"code","message"}} on stdout. Codes:
 E_USAGE, E_TARGET_MISSING, E_TARGET_NOT_DIRECTORY, E_OUTPUT_IS_TARGET,
 E_OUTPUT_CONTAINS_TARGET, E_OUTPUT_NOT_EMPTY_UNOWNED, E_OUTPUT_RUN_EXISTS,
-E_UNDECLARED_RUN_DIR, E_WORKTREE_SYMLINK_ESCAPE, E_RUN_STATE,
-E_RUN_MARKER_MISSING, E_UNEXPECTED.`
+E_UNDECLARED_RUN_DIR, E_WORKTREE_SYMLINK_ESCAPE, E_SCOPE_UNKNOWN,
+E_SCOPE_EMPTY, E_RUN_STATE, E_RUN_MARKER_MISSING, E_UNEXPECTED.`
 
 // An undeclared secaudit-run.json inside the target silently drops its whole subtree from
 // enumeration, hashing, and every hunter — a false all-clear. Only the operator can resolve it.
@@ -46,6 +49,20 @@ function undeclaredRunDirMessage(excludedRunDirs) {
     + 'publication gate, so the run would certify a corpus it never read'
 }
 
+// Scope mistakes must never degrade quietly into a wider or narrower audit than the operator
+// asked for: a typo that silently audits nothing is a false all-clear.
+function assertScopeUsable({ scope, scopeMisses }, coverage) {
+  if (scopeMisses.length > 0) {
+    throw new RuntimeError('E_SCOPE_UNKNOWN',
+      'scope entries matched nothing under the target: ' + scopeMisses.join(', ')
+      + ' — check the paths (they are relative to the target, forward-slashed) and re-run')
+  }
+  if (scope.length > 0 && coverage.sourceFiles === 0) {
+    throw new RuntimeError('E_SCOPE_EMPTY',
+      'the selected scope contains no recognized source files: ' + scope.join(', '))
+  }
+}
+
 const MANIFEST_NAMES = new Set([
   'package.json', 'pom.xml', 'requirements.txt', 'pyproject.toml', 'go.mod',
 ])
@@ -54,10 +71,17 @@ const MANIFEST_EXTENSIONS = new Set(['.csproj', '.sln', '.graphql'])
 function parseArgs(argv) {
   const [command, ...rest] = argv
   const flags = { '--target': 'target', '--output': 'output' }
-  const options = { command }
+  const options = { command, scope: [] }
   for (let i = 0; i < rest.length; i++) {
     if (rest[i] === '--help') {
       options.help = true
+      continue
+    }
+    if (rest[i] === '--scope') {
+      const value = rest[++i]
+      if (value == null) throw new RuntimeError('E_USAGE', 'missing value for --scope')
+      // Repeatable, and one flag may carry a comma-separated list — operators type both.
+      options.scope.push(...value.split(',').map(sc => sc.trim()).filter(Boolean))
       continue
     }
     const key = flags[rest[i]]
@@ -77,8 +101,8 @@ function isManifest(rel) {
 export async function inspect(options) {
   const target = await resolveTarget(options.target, process.cwd())
   const { artifactRoot, artifactRootSource } = await resolveArtifactRoot(target, process.cwd())
-  const { files, internalSymlinks, externalSymlinks, excludedDirsHit, excludedRunDirs } =
-    await enumerateSource(target)
+  const { files, internalSymlinks, externalSymlinks, excludedDirsHit, excludedRunDirs, scope,
+    scopeMisses } = await enumerateSource(target, { scope: options.scope ?? [] })
   const coverage = await measureSource(target, files)
   const extensions = {}
   for (const rel of files) {
@@ -100,6 +124,10 @@ export async function inspect(options) {
         : 'the target sits inside that repository')
       + '); pass --output to place them somewhere else')
   }
+  if (scopeMisses.length > 0) {
+    warnings.push('scope entries matched nothing under the target: ' + scopeMisses.join(', ')
+      + ' — prepare will refuse until they are corrected')
+  }
   if (excludedRunDirs.length > 0) {
     warnings.push('CORPUS INTEGRITY: ' + undeclaredRunDirMessage(excludedRunDirs)
       + ' (each holds a secaudit-run.json marker); prepare will refuse until then')
@@ -110,6 +138,8 @@ export async function inspect(options) {
     artifactRoot,
     artifactRootSource,
     coverage,
+    scope,
+    scopeMisses,
     extensions,
     manifests: files.filter(isManifest),
     exclusionsApplied: excludedDirsHit,
@@ -179,14 +209,15 @@ export async function prepare(options) {
     const planned = await canonicalizePlanned(options.output)
     if (planned.startsWith(target + sep)) extraExcluded.push(planned)
   }
-  const { files, internalSymlinks, externalSymlinks, excludedRunDirs } =
-    await enumerateSource(target, { extraExcluded })
+  const { files, internalSymlinks, externalSymlinks, excludedRunDirs, scope, scopeMisses } =
+    await enumerateSource(target, { extraExcluded, scope: options.scope ?? [] })
   // Fail closed BEFORE writing anything: those subtrees are absent from the corpus we are about
   // to hash and copy, and both sides of the publication gate would agree on the pruned corpus.
   if (excludedRunDirs.length > 0) {
     throw new RuntimeError('E_UNDECLARED_RUN_DIR', undeclaredRunDirMessage(excludedRunDirs))
   }
   const coverage = await measureSource(target, files)
+  assertScopeUsable({ scope, scopeMisses }, coverage)
   const corpusSha256 = await hashSource(target, files,
     [...internalSymlinks, ...externalSymlinks])
   const nowIso = new Date().toISOString()
@@ -213,8 +244,11 @@ export async function prepare(options) {
     createdUtc: nowIso,
     state: 'prepared',
     insideTarget,
+    projectRoot: artifactRoot,
     artifactRoot,
     artifactRootSource,
+    scope,
+    work,
     coverage,
     corpusSha256,
     skippedExternalSymlinks: externalSymlinks,
@@ -224,6 +258,8 @@ export async function prepare(options) {
     runDir,
     work,
     target,
+    projectRoot: artifactRoot,
+    scope,
     coverage,
     corpusSha256,
     generatedDate,

@@ -268,3 +268,44 @@ assert.strictEqual(subPrep.insideTarget, false)
 assert.ok(!existsSync(join(target, 'src', '.secaudit')))
 
 console.log('PASS runtime-prepare')
+
+// --- scoped prepare --------------------------------------------------------
+{
+  const scopedTarget = realpathSync.native(mkdtempSync(join(tmpdir(), 'secaudit scoped-')))
+  mkdirSync(join(scopedTarget, 'api'))
+  mkdirSync(join(scopedTarget, 'web'))
+  writeFileSync(join(scopedTarget, 'api', 'a.py'), 'a = 1\n', 'utf8')
+  writeFileSync(join(scopedTarget, 'web', 'b.py'), 'b = 1\n', 'utf8')
+  execFileSync('git', [...gitEnv, 'init', '-q', scopedTarget])
+
+  const out = JSON.parse(execFileSync('node', [cli, 'prepare', '--target', scopedTarget,
+    '--scope', 'api'], { encoding: 'utf8' }))
+
+  assert.deepEqual(out.scope, ['api'])
+  // The run context names the real project, not a staging directory.
+  assert.equal(out.projectRoot, scopedTarget)
+  assert.equal(out.target, scopedTarget)
+  // Only in-scope source was copied.
+  assert.ok(existsSync(join(out.work, 'api', 'a.py')))
+  assert.ok(!existsSync(join(out.work, 'web', 'b.py')))
+  assert.equal(out.coverage.sourceFiles, 1)
+
+  const marker = JSON.parse(readFileSync(join(out.runDir, 'secaudit-run.json'), 'utf8'))
+  assert.equal(marker.state, 'prepared')
+  assert.deepEqual(marker.scope, ['api'])
+  assert.equal(marker.work, out.work)
+  assert.equal(marker.projectRoot, scopedTarget)
+
+  // A scope entry that matches nothing is refused before anything is written.
+  let bad
+  try {
+    execFileSync('node', [cli, 'prepare', '--target', scopedTarget, '--scope', 'nope'],
+      { encoding: 'utf8' })
+    assert.fail('expected a non-zero exit for an unmatched scope entry')
+  } catch (err) {
+    bad = JSON.parse(err.stdout)
+  }
+  assert.equal(bad.error.code, 'E_SCOPE_UNKNOWN')
+
+  console.log('runtime-prepare scope: ok')
+}
