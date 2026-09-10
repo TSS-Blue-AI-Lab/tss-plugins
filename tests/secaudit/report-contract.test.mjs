@@ -6,7 +6,6 @@ import {
   validateReportData, findingId, classifyFinding, sortFindings,
   summaryFor, escapeHtml, formatDate,
 } from '../../plugins/secaudit/skills/secaudit-generate-artifacts/scripts/report-contract.mjs'
-import { fillTemplate } from '../../plugins/secaudit/skills/secaudit-generate-artifacts/scripts/render-report.mjs'
 import { missingArtifacts } from '../../plugins/secaudit/skills/secaudit-generate-artifacts/scripts/verify-artifacts.mjs'
 
 // Fixtures are test-only data and live alongside this test file, not inside the shipped plugin.
@@ -41,22 +40,13 @@ const emptyReason = structuredClone(data)
 emptyReason.findings[0].challengeReason = ''
 assert.throws(() => validateReportData(emptyReason), /finding\.challengeReason is required/)
 
-// fillTemplate: injected finding text may legitimately contain brace pairs (e.g. AngularJS
-// `{{expr}}` quoted from the audited source) — it must render verbatim, not be mistaken for an
-// unfilled template token. Regression for a renderer that scanned the FILLED output.
-const filled = fillTemplate('# {{PROJECT}}\n{{CONFIRMED_FINDINGS}}',
-  { PROJECT: 'demo', CONFIRMED_FINDINGS: 'href="{{child.url}}" and {{expr}}' })
-assert.strictEqual(filled, '# demo\nhref="{{child.url}}" and {{expr}}')
-// A genuinely unfilled/misspelled TEMPLATE token still throws.
-assert.throws(() => fillTemplate('{{PROJCT}}', { PROJECT: 'demo' }),
-  /unresolved template token \{\{PROJCT\}\}/)
-
 // missingArtifacts: a deliverable counts as present only if it exists with >0 bytes; -1 (missing),
 // 0 (empty), or a non-integer size must be flagged — the fail-loud gate that stops a publish agent
 // reporting success while having written nothing.
-assert.deepStrictEqual(missingArtifacts({ reportMd: 10, reportHtml: 20, traceMd: 5 }), [])
-assert.deepStrictEqual(missingArtifacts({ reportMd: 10, reportHtml: -1, traceMd: 5 }), ['report.html'])
-assert.deepStrictEqual(missingArtifacts({ reportMd: 0, reportHtml: 20, traceMd: 0 }), ['report.md', 'trace.md'])
-assert.deepStrictEqual(missingArtifacts({}), ['report.md', 'report.html', 'trace.md'])
+const reportDataRel = join('work', 'sast', 'report-data.json')
+assert.deepStrictEqual(missingArtifacts({ traceMd: 5, reportData: 20 }), [])
+assert.deepStrictEqual(missingArtifacts({ traceMd: 5, reportData: -1 }), [reportDataRel])
+assert.deepStrictEqual(missingArtifacts({ traceMd: 0, reportData: 20 }), ['trace.md'])
+assert.deepStrictEqual(missingArtifacts({}), ['trace.md', reportDataRel])
 
 console.log('PASS report-contract')

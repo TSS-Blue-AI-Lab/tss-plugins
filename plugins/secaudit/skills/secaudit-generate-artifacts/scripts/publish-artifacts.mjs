@@ -1,8 +1,10 @@
 #!/usr/bin/env node
-// secaudit-generate-artifacts publisher: copies the final report into the run
-// directory and prunes the scratch work tree, but ONLY after re-verifying the
+// secaudit-generate-artifacts publisher: writes the run's provenance trace into the
+// run directory and prunes the scratch work tree, but ONLY after re-verifying the
 // source corpus hasn't changed since the audit ran. This is the security-critical
 // gate: a non-pristine corpus must never cause a partial publish or a prune.
+// The human view is the Workbench dashboard, which reads work/sast/report-data.json; no
+// rendered report is produced.
 import { readdir, readFile, writeFile, rename, rm, stat, realpath } from 'node:fs/promises'
 import { join, sep, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -90,11 +92,7 @@ export async function publishArtifacts(options) {
 
   const sastDir = join(work, 'sast')
   await requireDirectory(sastDir, 'work/sast')
-  const finalMdPath = join(sastDir, 'final-report.md')
-  const finalHtmlPath = join(sastDir, 'final-report.html')
   const reportDataPath = join(sastDir, 'report-data.json')
-  await requireFile(finalMdPath, 'work/sast/final-report.md')
-  await requireFile(finalHtmlPath, 'work/sast/final-report.html')
   await requireFile(reportDataPath, 'work/sast/report-data.json')
   await requireFile(ledgerPath, 'ledgerPath')
 
@@ -142,8 +140,6 @@ export async function publishArtifacts(options) {
   // --- 3. Pristine: copy artifacts via .tmp siblings, rename only after each
   //        write succeeds, THEN prune the work tree. ---
   const summary = summaryFor(reportData.findings)
-  const finalMd = await readFile(finalMdPath, 'utf8')
-  const finalHtml = await readFile(finalHtmlPath, 'utf8')
   // The run directory follows the project root, so it is not necessarily inside what was
   // audited: the trace has to name the tree the hash was taken over.
   const traceMd = buildTraceMd({
@@ -151,8 +147,6 @@ export async function publishArtifacts(options) {
     target: canonicalTarget,
   })
 
-  await atomicWrite(join(runDir, 'report.md'), finalMd)
-  await atomicWrite(join(runDir, 'report.html'), finalHtml)
   await atomicWrite(join(runDir, 'trace.md'), traceMd)
 
   await pruneWorkExceptSast(work)

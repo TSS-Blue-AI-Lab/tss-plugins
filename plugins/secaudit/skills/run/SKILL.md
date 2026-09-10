@@ -205,8 +205,9 @@ stop and re-launch with the correct `hunters:` array.
 ## Step 4 — report back
 
 When the workflow finishes, report to the user: counts of CONFIRMED / REFUTED / MANUAL REVIEW,
-the top 3 CONFIRMED findings, and the paths to `<runDir>/report.md`, `<runDir>/report.html`,
-and `<runDir>/trace.md`. Remind the user the run directory is ephemeral — it ignores its own
+the top 3 CONFIRMED findings, and the paths to `<runDir>/trace.md` and
+`<runDir>/work/sast/report-data.json`. No report is rendered — the findings are read in the
+`secaudit:issues` dashboard. Remind the user the run directory is ephemeral — it ignores its own
 contents wherever it sits in a working tree, and holds a full copy of the audited tree including
 its `.env` — so copy out anything worth keeping and delete it when done. Never claim the codebase is "secure."
 

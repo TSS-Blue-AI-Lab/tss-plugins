@@ -392,11 +392,11 @@ note('Dedupe: deduped.md written')
 phase('Trace')
 await traceDefects()
 
-// ---- Stage 8: Generate Artifacts (deterministic assembly, render, and publish — replaces
-// the old free-form Report + Harvest stages). Three robustAgent operations: the model only
-// ASSEMBLES facts into report-data.json (never hand-writes buckets/counts/Markdown/HTML);
-// render-report.mjs and publish-artifacts.mjs are deterministic Node CLIs the agent runs via
-// bash, mirroring how the old Harvest agent ran bash commands and returned parsed JSON. ----
+// ---- Stage 8: Generate Artifacts (deterministic assembly and publish — replaces the old
+// free-form Report + Harvest stages). The model only ASSEMBLES facts into report-data.json
+// (never hand-writes buckets or counts); publish-artifacts.mjs is a deterministic Node CLI the
+// agent runs via bash, mirroring how the old Harvest agent ran bash commands and returned
+// parsed JSON. No report is rendered — the human view is the secaudit:issues dashboard. ----
 phase('Generate Artifacts')
 
 const assembled = await robustAgent(
@@ -409,12 +409,6 @@ const assembled = await robustAgent(
   } },
 )
 note(`Generate Artifacts / Assemble: ${assembled.reportData} written and schema-validated`)
-
-await robustAgent(
-  `Run: node "${SKILLS}/secaudit-generate-artifacts/scripts/render-report.mjs" --data "${assembled.reportData}" --out-md "${work}/sast/final-report.md" --out-html "${work}/sast/final-report.html". If it exits non-zero, throw its stderr verbatim — do not continue past a failed render.`,
-  { label: 'artifacts:render', phase: 'Generate Artifacts' },
-)
-note('Generate Artifacts / Render: final-report.md + final-report.html written')
 
 // run-ledger.json: the ordered stage/operation ledger, the hunter list, whether Blindspot
 // Sweep replayed a round, how many hunters that replay covered, and the final Challenge
@@ -438,18 +432,18 @@ const artifactSummary = await robustAgent(
     },
   } },
 )
-note(`Generate Artifacts / Publish: ${artifactSummary.confirmed} confirmed / ${artifactSummary.refuted} refuted / ${artifactSummary.manualReview} manual review → ${runDir}/report.md`)
+note(`Generate Artifacts / Publish: ${artifactSummary.confirmed} confirmed / ${artifactSummary.refuted} refuted / ${artifactSummary.manualReview} manual review → ${runDir}`)
 
 // Fail-loud post-condition on the DELIVERABLES. The publish step above runs inside an LLM agent,
 // which can return a plausible {confirmed,refuted,manualReview} even when publish-artifacts.mjs
 // threw and wrote nothing (an agent narrating success it never achieved — this masked a real
-// render failure once). The workflow sandbox can't stat files itself, so a separate read-only
+// publish failure once). The workflow sandbox can't stat files itself, so a separate read-only
 // agent runs the deterministic verify-artifacts.mjs (which exits non-zero and lists any missing
 // or empty file), and we assert its computed `missing` list here in the control plane — an
 // independent check with no stake in publish having succeeded.
 const verified = await robustAgent(
   `Run: node "${SKILLS}/secaudit-generate-artifacts/scripts/verify-artifacts.mjs" --run-dir "${runDir}"\n` +
-  `It prints one JSON line {sizes, missing}: sizes are the byte sizes of report.md/report.html/trace.md at ${runDir} (-1 if absent), and missing lists any that are absent or empty. It exits non-zero when missing is non-empty. Return {missing} exactly as printed. Read-only — create or edit nothing.`,
+  `It prints one JSON line {sizes, missing}: sizes are the byte sizes of trace.md and work/sast/report-data.json at ${runDir} (-1 if absent), and missing lists any that are absent or empty. It exits non-zero when missing is non-empty. Return {missing} exactly as printed. Read-only — create or edit nothing.`,
   { label: 'artifacts:verify', phase: 'Generate Artifacts', schema: {
     type: 'object', required: ['missing'],
     properties: { missing: { type: 'array', items: { type: 'string' } } },
@@ -459,7 +453,7 @@ if (verified.missing.length) {
   throw new Error(`secaudit: publish reported success but ${verified.missing.join(', ')} missing or empty ` +
     `at ${runDir} — the deterministic publish did not produce the deliverables. Resume to re-generate.`)
 }
-note('Generate Artifacts / Verify: report.md + report.html + trace.md present on disk')
+note('Generate Artifacts / Verify: trace.md + work/sast/report-data.json present on disk')
 
 return {
   runDir,

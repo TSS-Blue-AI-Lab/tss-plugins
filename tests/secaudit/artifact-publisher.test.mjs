@@ -44,8 +44,6 @@ function makeRunDir({ withMarker = true } = {}) {
 function populateWork(work) {
   const sastDir = join(work, 'sast')
   mkdirSync(sastDir)
-  writeFileSync(join(sastDir, 'final-report.md'), '# Report\n', 'utf8')
-  writeFileSync(join(sastDir, 'final-report.html'), '<html></html>', 'utf8')
   writeFileSync(join(sastDir, 'report-data.json'), JSON.stringify(reportData), 'utf8')
   writeFileSync(join(sastDir, 'run-ledger.json'), JSON.stringify({ stage: 'report', status: 'complete' }), 'utf8')
   // Scratch left over from earlier stages; must be pruned on success, left alone on rejection.
@@ -74,9 +72,11 @@ function makeWork(runDir) {
   })
 
   assert.deepStrictEqual(summary, { confirmed: 1, refuted: 2, manualReview: 2 })
-  assert.strictEqual(readFileSync(join(runDir, 'report.md'), 'utf8'), '# Report\n')
-  assert.strictEqual(readFileSync(join(runDir, 'report.html'), 'utf8'), '<html></html>')
+  // Provenance and structured findings, and nothing else.
   assert.ok(existsSync(join(runDir, 'trace.md')), 'trace.md must be written')
+  assert.ok(existsSync(join(work, 'sast', 'report-data.json')), 'report-data.json must survive the prune')
+  assert.ok(!existsSync(join(runDir, 'report.md')), 'no rendered markdown report')
+  assert.ok(!existsSync(join(runDir, 'report.html')), 'no rendered HTML report')
   const trace = readFileSync(join(runDir, 'trace.md'), 'utf8')
   assert.match(trace, /pristine/i)
   assert.match(trace, /"stage": "report"/, 'trace.md must include ledger contents')
@@ -88,7 +88,7 @@ assert.match(trace, /sourceFiles|Source files/i, 'trace.md must include coverage
   assert.deepStrictEqual(readdirSync(work), ['sast'], 'work must only contain sast after publish')
 
   // No .tmp siblings must remain.
-  for (const name of ['report.md.tmp', 'report.html.tmp', 'trace.md.tmp']) {
+  for (const name of ['trace.md.tmp']) {
     assert.ok(!existsSync(join(runDir, name)), name + ' must not remain')
   }
 }
@@ -143,7 +143,7 @@ assert.match(trace, /sourceFiles|Source files/i, 'trace.md must include coverage
     '--ledger', ledgerPath,
   ]).toString('utf8').trim()
   assert.deepStrictEqual(JSON.parse(output), { confirmed: 1, refuted: 2, manualReview: 2 })
-  assert.ok(existsSync(join(runDir, 'report.md')))
+  assert.ok(existsSync(join(runDir, 'trace.md')))
 }
 
 // --- Default-layout publish: runDir inside the target must not poison the pristine rehash ---

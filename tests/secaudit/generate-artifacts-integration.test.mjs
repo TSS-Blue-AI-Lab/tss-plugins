@@ -1,7 +1,7 @@
-// End-to-end Task 7 integration test: drives the SAME two CLIs the workflow's Generate
-// Artifacts phase runs (render-report.mjs, then publish-artifacts.mjs) over the shared
-// fixture report-data.json, exactly like a real assemble→render→publish run would, and
-// asserts the final artifacts land where the workflow/orchestrator promise they will.
+// End-to-end integration test: drives the SAME CLI the workflow's Generate Artifacts phase
+// runs (publish-artifacts.mjs) over the shared fixture report-data.json, exactly like a real
+// assemble→publish run would, and asserts the run's deliverables land where the
+// workflow/orchestrator promise they will.
 import {
   mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync,
 } from 'node:fs'
@@ -16,7 +16,6 @@ import { enumerateSource, hashSource } from '../../plugins/secaudit/skills/run/s
 const here = dirname(fileURLToPath(import.meta.url))
 const root = join(here, '..', '..', 'plugins', 'secaudit')
 const skillDir = join(root, 'skills/secaudit-generate-artifacts/scripts')
-const renderScript = join(skillDir, 'render-report.mjs')
 const publishScript = join(skillDir, 'publish-artifacts.mjs')
 // Fixtures are test-only data and live alongside this test file, not inside the shipped plugin.
 const reportData = readFileSync(join(here, 'fixtures/report-data.json'), 'utf8')
@@ -56,16 +55,6 @@ writeFileSync(ledgerPath, JSON.stringify({
   finalChallengeBatchCount: 3,
 }), 'utf8')
 
-// --- Generate: render-report.mjs CLI turns report-data.json into final-report.md/.html ---
-execFileSync('node', [
-  renderScript,
-  '--data', join(sastDir, 'report-data.json'),
-  '--out-md', join(sastDir, 'final-report.md'),
-  '--out-html', join(sastDir, 'final-report.html'),
-])
-assert.ok(existsSync(join(sastDir, 'final-report.md')), 'render must write final-report.md')
-assert.ok(existsSync(join(sastDir, 'final-report.html')), 'render must write final-report.html')
-
 // --- Publish: publish-artifacts.mjs CLI re-verifies pristine, copies, prunes, prints summary ---
 const output = execFileSync('node', [
   publishScript,
@@ -82,10 +71,11 @@ assert.deepStrictEqual(JSON.parse(lastStdoutLine), {
   refuted: 2,
   manualReview: 2,
 })
-for (const name of ['report.md', 'report.html', 'trace.md']) {
-  assert.ok(existsSync(join(runDir, name)), name)
-}
+assert.ok(existsSync(join(runDir, 'trace.md')), 'trace.md')
 assert.ok(existsSync(join(work, 'sast', 'report-data.json')))
+for (const name of ['report.md', 'report.html']) {
+  assert.ok(!existsSync(join(runDir, name)), 'no rendered ' + name)
+}
 assert.deepStrictEqual(readdirSync(work), ['sast'])
 
 console.log('PASS generate-artifacts-integration')

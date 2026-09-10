@@ -90,11 +90,13 @@ One run writes exactly one directory:
 
 ```
 <project-root>/.secaudit/runs/<run-id>/
-├── report.md          # findings, buckets, counts
-├── report.html         # the same report, rendered
 ├── trace.md            # corpus hash, coverage, template version, stage ledger
-└── work/sast/          # retained evidence: per-Hunter results, deduped set, report data
+└── work/sast/          # per-Hunter results, deduped set, and report-data.json — the
+                        # structured findings the secaudit:issues dashboard reads
 ```
+
+No report is rendered. `report-data.json` is the run's record of what it found, and the
+`secaudit:issues` dashboard is the human view of it.
 
 The project root is the audited tree's own Git toplevel; if the audited tree is in no
 repository — a staged or copied workspace, say — it is the Git toplevel above your current
