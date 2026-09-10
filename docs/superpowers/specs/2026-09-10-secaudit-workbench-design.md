@@ -2,7 +2,7 @@
 
 Date: 2026-09-10
 
-Status: Workbench visual design approved by the user. This document consolidates the agreed product behavior and proposes the technical boundaries for written-spec review before implementation planning.
+Status: Workbench visual design approved by the user. This document consolidates the agreed product behavior and the technical boundaries for implementation. Revised 2026-09-10 during implementation planning: rendered reports are retired in favor of the dashboard, human reopen returns an issue to the inbox, suppression is enforced deterministically at publication, and the interface is recreated in full rather than partially. Implementation plans live in `docs/superpowers/plans/2026-09-10-secaudit-run-lifecycle.md`, `-issue-store.md`, and `-workbench-dashboard.md`.
 
 ## Approved visual reference
 
@@ -30,7 +30,7 @@ This work covers four connected parts: source-copy ownership and cleanup, predic
 - The sibling `tss-invoice-engine/.secaudit` demonstrates both `runs/<id>/sast/report-data.json` and `runs/<id>/work/sast/report-data.json`. Existing history must remain usable across both layouts.
 - Its September run also illustrates staging outside the owned work tree. Cleanup of the normal work tree cannot remove such staging reliably.
 
-The existing reports are the audit record. A new issue store adds identity, relationships, and human decisions; it does not rerun old audits to recreate their data.
+The existing structured findings are the audit record. A new issue store adds identity, relationships, and human decisions; it does not rerun old audits to recreate their data.
 
 ## Agreed product behavior
 
@@ -40,7 +40,9 @@ Keep persistent run history in the target project's `.secaudit`. Select audit sc
 
 Create all source copies through one runtime-owned path. Preserve the original target's project identity when copying a selected scope. Do not let a temporary staging directory become the inferred project or artifact root.
 
-Copied source is temporary and must be removed after successful publication. Retain reports, structured findings, coverage, and stage evidence. The source copy must not remain available as part of a successful run's history.
+Copied source is temporary and must be removed after successful publication. Retain the structured findings, coverage, and stage evidence. The source copy must not remain available as part of a successful run's history.
+
+A run no longer produces a rendered report. `report-data.json` is the structured record and `trace.md` the provenance — corpus hash, coverage, and stage ledger. The Workbench is the human view, so a second rendered view of the same data would be a parallel surface to keep in sync, and the weaker one: no persistence, no cross-run identity, no triage. Existing run directories keep whatever they already published; nothing rewrites a past run's artifacts.
 
 Preserve the documented exact-directory meaning of `--output`. Explicit output selection must be used consistently by preparation, workflow, publication, and dashboard discovery. The runtime remains responsible for validating ownership, overlapping paths, and symlink aliases.
 
@@ -54,13 +56,19 @@ The board has three columns:
 
 There is no Fix in progress column. Audit verdicts and reachability remain separate from human workflow status; an audit's CONFIRMED bucket does not constitute human confirmation.
 
-Inbox findings can be confirmed or marked false positive. Confirmed findings can be marked done. Done findings can be reopened. Do not allow inbox-to-done to bypass human confirmation. Corrections to human triage remain possible and produce history entries.
+Inbox findings can be confirmed or marked false positive. Confirmed findings can be marked done. Done findings can be reopened, which returns them to the inbox: a human reopening a resolved issue is re-triaging it. Any board issue can be marked a false positive. Do not allow inbox-to-done to bypass human confirmation. Corrections to human triage remain possible and produce history entries.
+
+A human reopening an issue and an audit rediscovering one are different events with different destinations. The human action returns it to the inbox; the audit action lands it in Confirmed, because a human already confirmed that finding once and that decision is not discarded.
 
 A matching later observation attaches to the existing issue instead of creating another card. A previously done issue rediscovered as an actionable finding reopens the same issue into Confirmed, retaining its earlier human confirmation and resolution history. Absence from a later audit does not automatically mark an issue done: scope and coverage can differ.
 
-Human false positives live in a separate archive. Once suppressed, matching later audit observations must never raise that issue again or restore it to the inbox. Only an explicit human restore action lifts suppression and returns it to the inbox. The archive retains evidence and observation history.
+Human false positives live in a separate archive. Once suppressed, matching later audit observations must never raise that issue again or restore it to the inbox, and must not appear among a later run's actionable results. Only an explicit human restore action lifts suppression and returns it to the inbox. The archive retains evidence and observation history.
 
-Historical run reports remain an accurate record of what each audit emitted. The current actionable board and post-run summary must distinguish new, repeated, reopened, and suppressed observations, so repeats are not presented as new findings.
+Historical run records remain an accurate record of what each audit emitted. The current actionable board and post-run summary must distinguish new, repeated, reopened, and suppressed observations, so repeats are not presented as new findings.
+
+Suppression is enforced deterministically, by matching a finding's fingerprint against the archive at publication time and marking it dismissed in `report-data.json`. It is never enforced by instructing a model to ignore something: a prompt is not an access control. A dismissed finding stays in the structured record with its original audit verdict, is counted separately from the actionable results, and never reaches the board.
+
+The hunters are deliberately not told what is already known. A hunt that skips known ground stops confirming that open issues still exist, which is what keeps their last-seen information current and makes reopen-after-resolution work. The Challenge stage may receive an advisory list of dismissed findings so it does not re-argue a closed case, but that list is a courtesy and never the mechanism. An audit verdict is never rewritten from a human decision.
 
 ### Detail content
 
@@ -83,7 +91,9 @@ Keep the original audit verdict visible and distinguish it from human state. Let
 - Issue cards are compact and draggable between allowed columns; update counts and history when a move succeeds. Provide equivalent button actions so dragging is optional. Remove diagonal up-arrow decorations.
 - Keep the presentation focused: representative issues and severity, concise card metadata, full evidence inside details. Do not center the experience on reopened issues or add unnecessary metrics.
 
-The HTML is the visual authority for spacing, colors, borders, density, and interaction treatment. Production code should implement this design in focused components rather than carry forward exploratory CSS overrides from the prototype.
+The HTML is the visual authority for spacing, colors, borders, density, and interaction treatment.
+
+The production interface recreates that design in full — every view, component, state, and interaction the prototype has — rather than borrowing its palette and a few measurements. Exactly three things may differ: the illustrative findings and activity entries, which come from the real issue store instead; the prototype's dead `fieldnotes` and earlier board theme branches, which are not ported; and exploratory CSS overrides, which may be collapsed into focused components provided the rendered result is unchanged. Anything in the prototype that seems improvable is built as approved and raised separately: a redesign introduced during implementation is one nobody approved.
 
 ## Proposed technical design for implementation planning
 
