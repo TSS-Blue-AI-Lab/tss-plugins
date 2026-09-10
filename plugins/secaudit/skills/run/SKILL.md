@@ -233,5 +233,24 @@ publish; `<runDir>/work/sast/` keeps the stage evidence. If the run reports stat
 `cleanup-incomplete`, say so plainly and name the leftover entries — that run still holds a
 copy of the audited tree, including its `.env`. Never claim the codebase is "secure."
 
+Then bring the persistent board up to date and report what this run actually changed:
+
+```
+node "<PLUGIN_ROOT>/skills/issues/scripts/sync.mjs" --project "<projectRoot>"
+```
+
+Report its five summary numbers verbatim — `new`, `repeat`, `reopened`, `suppressed`,
+`ambiguous` — under these rules:
+
+- A `repeat` is a finding the board already knows about. Never describe it as new.
+- `suppressed` counts observations matching an issue a human already marked a false positive.
+  They stay archived and are not raised again.
+- `reopened` counts issues a human had marked done that this run found again.
+- `ambiguous` counts observations whose cross-run identity could not be established with
+  confidence; they need an explicit human merge decision on the board.
+- Name every `unavailable` run and its reason rather than omitting it.
+
+Open the board with `secaudit:issues` to triage.
+
 **Fallback (no Workflow engine, e.g. Codex):** follow
 `<PLUGIN_ROOT>/skills/secaudit-orchestrator/SKILL.md` stage-by-stage instead.
