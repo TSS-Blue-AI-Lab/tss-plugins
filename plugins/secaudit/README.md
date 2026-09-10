@@ -110,9 +110,15 @@ makes a clean repository look dirty. That matters beyond tidiness: the work tree
 verbatim copy of the target including dotfiles, so an unignored run directory puts real
 `.env` secrets one `git add -A` from a commit.
 
-Run directories are **ephemeral by design**: they are git-ignored, and deleting the checkout
-deletes the audit history with it. Copy out anything worth keeping. Deleting
-`<project-root>/.secaudit/runs/<run-id>/` is safe at any time — that is how you reclaim disk.
+The copied source is removed on a successful publish, leaving `work/sast/` — the stage
+evidence and `report-data.json`. A run that reports `cleanup-incomplete` still holds that copy
+and names what remains; delete those entries by hand. Deleting
+`<project-root>/.secaudit/runs/<run-id>/` is safe at any time — that is how you reclaim disk,
+though the dashboard then loses that run's history.
+
+Audit part of a repository with `--scope <target-relative-path>` (repeatable, or one
+comma-separated value) rather than staging a copy of the subset: scope restricts what is read
+while the target, project root, and corpus hash keep referring to the real repository.
 
 `--output` overrides the exact run directory, not just its parent. Paths that would make the
 isolated copy contain itself, that contain the target, or that point at a non-empty directory

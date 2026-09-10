@@ -45,8 +45,11 @@ Inspect the target to ground the Hunter recommendation and cost estimate:
 - Run the deterministic inspection (read-only, never writes to the target):
   `node "<PLUGIN_ROOT>/skills/run/scripts/secaudit-runtime.mjs" inspect --target "<target>"` — omit
   `--target` when the user gave no path (the runtime resolves the Git toplevel, else the
-  invocation directory). Parse its one-line JSON `{target, targetSource, artifactRoot,
-  artifactRootSource, coverage, extensions, manifests, warnings, …}`, show the resolved `target`
+  invocation directory). To audit only part of the target, add `--scope <target-relative-path>`
+  (repeatable, or one comma-separated value) — never hand-stage a subset of the repository,
+  because that destroys the project identity the run reports under. Parse its one-line JSON
+  `{target, targetSource, artifactRoot, artifactRootSource, coverage, scope, extensions,
+  manifests, warnings, …}`, show the resolved `target`
   to the user, and surface any `warnings` verbatim.
 - **Say where the report will land**: `<artifactRoot>/.secaudit/runs/`. The run directory follows
   the PROJECT root, not the audited tree — the audited tree's own repository, else the repository
@@ -139,4 +142,4 @@ bound below. The sweep still runs at most once whatever the plan shows.
      failed rather than reporting success.
 
 ## After the run
-Report the Confirmed / Refuted / Manual Review counts from the publish summary, the top 3 Confirmed findings, and the paths to `$RUNDIR/trace.md` and `$WORK/sast/report-data.json`. Read the findings in the `secaudit:issues` dashboard — no report is rendered. The run directory is ephemeral — git-ignored whenever it sits inside the audited repo, and holding a full copy of that repo including its `.env` — so tell the user to copy out anything worth keeping and delete it when done. Never claim the codebase is "secure."
+Report the Confirmed / Refuted / Manual Review counts from the publish summary, the top 3 Confirmed findings, and the paths to `$RUNDIR/trace.md` and `$WORK/sast/report-data.json`. Read the findings in the `secaudit:issues` dashboard — no report is rendered. The copied source is removed automatically on a successful publish; `$WORK/sast/` keeps the stage evidence. If publish reports state `cleanup-incomplete`, say so plainly and name the entries it listed as remaining — that run still holds a copy of the audited tree, including its `.env`, and needs deleting by hand. Never claim the codebase is "secure."

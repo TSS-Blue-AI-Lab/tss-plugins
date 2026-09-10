@@ -53,6 +53,11 @@ for (const [key, kind] of [
   }
 }
 const { work, runDir, runId, coverage, corpusSha256, generatedDate } = opts
+// The run context prepare resolved. Named `auditScope` because `scope` is already a hunt-round
+// parameter below, and the two mean different things. Both are carried, never re-derived: the
+// workflow has no filesystem access, so a path it invented would be a guess.
+const auditScope = Array.isArray(opts.scope) ? opts.scope : []
+const projectRoot = opts.projectRoot ?? null
 const pluginRoot = opts.pluginRoot
 // corpusSha256 is interpolated into the publish bash command, and is the pristine-corpus
 // gate — a malformed value either breaks the command or weakens the check.
@@ -183,6 +188,7 @@ async function robustAgent(prompt, opts) {
 // prepare; Recon is the architecture-mapping operation) ----
 phase('Recon')
 note('Recon / Prepare: ' + target + ' run ' + runId + ' — hunters=' + HUNTERS.length +
+  ' — scope=' + (auditScope.length ? auditScope.join(',') : 'whole-target') +
   ' — traceBatch=' + traceBatch)
 await robustAgent(
   `You are the Map operation inside Recon. Read ${SKILLS}/sast-analysis/SKILL.md and map ` + work +
@@ -457,6 +463,8 @@ note('Generate Artifacts / Verify: trace.md + work/sast/report-data.json present
 
 return {
   runDir,
+  scope: auditScope,
+  projectRoot,
   confirmed: artifactSummary.confirmed,
   refuted: artifactSummary.refuted,
   manualReview: artifactSummary.manualReview,

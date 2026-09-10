@@ -7,7 +7,7 @@ description: >-
   blindspot sweep, prepares an isolated run via the deterministic runtime, then
   starts the deterministic workflow. The workflow itself never prompts.
 disable-model-invocation: true
-argument-hint: "[repo-path] [--output <exact-run-directory>]"
+argument-hint: "[repo-path] [--scope <relative-path>] [--output <exact-run-directory>]"
 ---
 
 # secaudit:run — launch the audit
@@ -43,7 +43,7 @@ Run the deterministic inspection. If the user gave a repo path, pass it; if they
 `--output`, remember it for Step 3 (inspect does not take it):
 
 ```
-node "<PLUGIN_ROOT>/skills/run/scripts/secaudit-runtime.mjs" inspect --target <repo-path>
+node "<PLUGIN_ROOT>/skills/run/scripts/secaudit-runtime.mjs" inspect --target <repo-path> [--scope <relative-path>]...
 ```
 
 Omit `--target` entirely when the user gave no path — the runtime resolves the Git
@@ -115,6 +115,19 @@ Ask these in one AskUserQuestion call — the target question only when Step 1 r
    Never skip this question by inferring consent from the hunter answer. If the user picks a
    different path, the old `target`, `coverage` and recommendations are stale — discard them.
 
+0b. **Scope** (single select, ALWAYS ask — never reuse a previous run's scope, and never
+   restore one from an earlier run directory; scope is chosen fresh every time).
+   Question text: "Audit the whole target, or only part of it? Whole target is
+   `<coverage.sourceLines>` source LOC." Options:
+   1. **Whole target (Recommended)** — no `--scope`.
+   2. **Selected subdirectories** — the user types target-relative paths via Other
+      (comma-separated). Re-run Step 1 `inspect` with those `--scope` values and restate
+      the size line before continuing; a scope that matches nothing is refused with
+      `E_SCOPE_UNKNOWN`, and a scope with no source files with `E_SCOPE_EMPTY`.
+
+   Never hand-stage a subset of the repository to narrow an audit. `--scope` exists precisely
+   so the target, project root, and corpus hash keep referring to the real repository.
+
 1. **Hunters** (multiSelect). Question text MUST include:
    - The full valid class list verbatim: `businesslogic, fileupload, graphql, hardcodedsecrets,
      idor, jwt, missingauth, pathtraversal, rce, sqli, ssrf, ssti, xss, xxe`.
@@ -144,13 +157,19 @@ Create the isolated run with the deterministic runtime, using the `target` from 
 JSON (and the user's `--output` if they gave one):
 
 ```
-node "<PLUGIN_ROOT>/skills/run/scripts/secaudit-runtime.mjs" prepare --target <target> [--output <exact-run-directory>]
+node "<PLUGIN_ROOT>/skills/run/scripts/secaudit-runtime.mjs" prepare --target <target> [--scope <relative-path>]... [--output <exact-run-directory>]
 ```
 
-Parse its one-line JSON: `{runId, runDir, work, target, artifactRoot, coverage, corpusSha256,
-generatedDate, …}`. On `{"error":{code,message}}`, report the message and stop — never
-improvise a workspace. **Print the resolved `runDir`** before launching: it is where every
-artifact of this run will appear, and the only chance to redirect it is now.
+Parse its one-line JSON: `{runId, runDir, work, target, projectRoot, scope, artifactRoot,
+coverage, corpusSha256, generatedDate, …}`. On `{"error":{code,message}}`, report the message
+and stop — never improvise a workspace.
+
+**Before launching, print all three resolved facts** — they are the only chance to redirect
+the run:
+
+- `Target: <target>`
+- `Selected scope: <scope joined by ", ", or "whole target">`
+- `Output: <runDir>`
 
 Call the workflow with the chosen config, passing the prepare fields through verbatim. The
 `hunters:` argument is MANDATORY — substitute the user's selected classes as a literal array
@@ -164,6 +183,8 @@ Workflow({
     work: "<work>",
     runDir: "<runDir>",
     runId: "<runId>",
+    scope: <scope array, verbatim>,
+    projectRoot: "<projectRoot>",
     coverage: <coverage object, verbatim>,
     corpusSha256: "<corpusSha256>",
     generatedDate: "<generatedDate>",
@@ -207,9 +228,10 @@ stop and re-launch with the correct `hunters:` array.
 When the workflow finishes, report to the user: counts of CONFIRMED / REFUTED / MANUAL REVIEW,
 the top 3 CONFIRMED findings, and the paths to `<runDir>/trace.md` and
 `<runDir>/work/sast/report-data.json`. No report is rendered — the findings are read in the
-`secaudit:issues` dashboard. Remind the user the run directory is ephemeral — it ignores its own
-contents wherever it sits in a working tree, and holds a full copy of the audited tree including
-its `.env` — so copy out anything worth keeping and delete it when done. Never claim the codebase is "secure."
+`secaudit:issues` dashboard. The copied source is removed automatically on a successful
+publish; `<runDir>/work/sast/` keeps the stage evidence. If the run reports state
+`cleanup-incomplete`, say so plainly and name the leftover entries — that run still holds a
+copy of the audited tree, including its `.env`. Never claim the codebase is "secure."
 
 **Fallback (no Workflow engine, e.g. Codex):** follow
 `<PLUGIN_ROOT>/skills/secaudit-orchestrator/SKILL.md` stage-by-stage instead.

@@ -18,3 +18,11 @@ task's own marker code block (the authoritative one, and what the test asserts) 
 Wrote the code block as given. `formatVersion: 2` from Task 1 already carries the same
 "this marker is the v2 shape" fact, so a second version number would be one more thing that
 can disagree with itself.
+
+### D3 — Workflow names the run's scope `auditScope`, not `scope`
+Task 6 says to add `const scope = Array.isArray(args.scope) ? args.scope : []` to
+`workflows/secaudit.js`. That file already uses `scope` as the hunt-round parameter meaning
+"the focused re-hunt task list" (`scope=null → full first round`). Two different meanings under
+one name in one file is a misreading waiting to happen, so the run context is `auditScope`.
+The ledger line still prints `scope=…` as the plan specifies, and the workflow result still
+returns the field as `scope`.

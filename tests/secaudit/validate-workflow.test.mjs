@@ -161,6 +161,10 @@ assert.match(src, /const SKILLS = pluginRoot \+ '\/skills'/, 'SKILLS derives fro
 // The launcher targets the namespaced plugin workflow, so meta.name must stay 'secaudit'.
 assert.match(src, /name: 'secaudit',/, "meta.name is 'secaudit' (installs as /secaudit:secaudit)")
 
+// The workflow must pass the run context through verbatim rather than re-deriving paths.
+assert.ok(src.includes('scope'), 'workflow must thread scope through')
+assert.ok(!/process\.cwd\(\)/.test(src), 'workflow must never re-derive paths from cwd')
+
 console.log('PASS validate-workflow structural checks')
 
 // ===========================================================================================
