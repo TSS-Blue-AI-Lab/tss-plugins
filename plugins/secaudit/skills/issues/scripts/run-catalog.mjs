@@ -30,7 +30,7 @@ export async function readCatalog(projectRoot) {
 // `.secaudit/` holds the catalog and the run directories, and it routinely sits inside a working
 // tree. An audit must never make a clean repository look dirty, so the index directory ignores
 // its own contents — the same guarantee each run directory already gives for its work tree.
-async function ensureIgnoredDir(dir) {
+export async function ensureIgnoredDir(dir) {
   await mkdir(dir, { recursive: true })
   const marker = join(dir, '.gitignore')
   if (!(await readFile(marker, 'utf8').catch(() => null))) {

@@ -36,3 +36,17 @@ than the tests (as the task instructs).
 2. `METHODLIKE` matched any call statement, so `return Sql(id);` anchored to `Sql` instead of
    the enclosing method `Get`. Added a `CONTROL_KEYWORDS` guard on the leading token; without
    it every call site reads as its own declaration and the anchor stops being stable.
+
+### D4 — `findMatch` resemblance now only bridges the legacy/anchor namespace gap
+Task 5's `findMatch` fell back to "same class and path" resemblance for ANY observation whose
+fingerprint did not match exactly, which collapsed two genuinely distinct anchored defects in
+one file into one issue — the task's own test ("two independent defects in one file remain two
+issues") caught it. Two differing anchored fingerprints are two defects; that is what the
+anchor is for. Resemblance is now restricted to the case the plan's prose describes: an
+observation whose fingerprint kind (legacy vs anchor) no existing issue on that file holds, so
+no comparison is possible and only a human can decide.
+
+### D5 — `writeStore` reuses the catalog's ignored-directory helper
+`issues.json` lands in the same `.secaudit/` the catalog does, so it inherits the same
+requirement (D1): the directory must ignore its own contents or every audited repo shows up
+dirty. Exported `ensureIgnoredDir` from `run-catalog.mjs` rather than duplicating it.
