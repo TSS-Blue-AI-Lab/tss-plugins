@@ -28,6 +28,10 @@ store = out.store
 assert.equal(store.issues.length, 1)
 assert.equal(store.issues[0].humanState, 'inbox')
 assert.equal(out.outcomes[0].outcome, 'new')
+// The full observation is kept alongside the reference, so the detail view survives the run
+// directory being pruned.
+assert.equal(store.issues[0].evidence[store.issues[0].observations[0].observationId].title,
+  'SQL injection')
 
 // Re-ingesting the same run changes nothing at all.
 const before = JSON.stringify(store)

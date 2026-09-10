@@ -73,6 +73,9 @@ function attach(issue, observation, runCreatedUtc) {
       observationId: observation.observationId,
       fingerprint: observation.fingerprint,
     }],
+    // The full record, kept so the detail view can show the audit's own words after the run
+    // directory is gone. Keyed by observationId, never overwritten in place.
+    evidence: { ...issue.evidence, [observation.observationId]: observation },
     lastSeenRunId: observation.runId,
   }
   if (issue.humanState === 'suppressed') {
@@ -115,6 +118,7 @@ function createIssue(observation, runCreatedUtc, ambiguous) {
       observationId: observation.observationId,
       fingerprint: observation.fingerprint,
     }],
+    evidence: { [observation.observationId]: observation },
     firstSeenRunId: observation.runId,
     lastSeenRunId: observation.runId,
     lastHumanUtc: null,
