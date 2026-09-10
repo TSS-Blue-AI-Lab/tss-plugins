@@ -16,7 +16,8 @@ export const SOURCE_EXTENSIONS = new Set([
 // Mirrors run-paths.mjs' readMarker envelope check (marker + formatVersion),
 // inlined so this stays a leaf module with no dependency on run-paths.mjs.
 const RUN_MARKER_NAME = 'secaudit-run.json'
-const RUN_MARKER_FORMAT_VERSION = 1
+// Mirrors run-paths.mjs' SUPPORTED_MARKER_VERSIONS, inlined so this stays a leaf module.
+const RUN_MARKER_FORMAT_VERSIONS = new Set([1, 2])
 
 async function isRunMarkerDir(dirAbs, entries) {
   if (!entries.some(e => e.isFile() && e.name === RUN_MARKER_NAME)) return false
@@ -24,7 +25,7 @@ async function isRunMarkerDir(dirAbs, entries) {
   if (raw == null) return false
   try {
     const parsed = JSON.parse(raw)
-    return parsed.marker === 'secaudit-run' && parsed.formatVersion === RUN_MARKER_FORMAT_VERSION
+    return parsed.marker === 'secaudit-run' && RUN_MARKER_FORMAT_VERSIONS.has(parsed.formatVersion)
   } catch {
     return false
   }

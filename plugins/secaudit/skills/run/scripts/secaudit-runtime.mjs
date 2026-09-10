@@ -26,7 +26,8 @@ Results: one JSON line on stdout. Diagnostics: stderr.
 Failure: exit 1 with {"error":{"code","message"}} on stdout. Codes:
 E_USAGE, E_TARGET_MISSING, E_TARGET_NOT_DIRECTORY, E_OUTPUT_IS_TARGET,
 E_OUTPUT_CONTAINS_TARGET, E_OUTPUT_NOT_EMPTY_UNOWNED, E_OUTPUT_RUN_EXISTS,
-E_UNDECLARED_RUN_DIR, E_WORKTREE_SYMLINK_ESCAPE, E_UNEXPECTED.`
+E_UNDECLARED_RUN_DIR, E_WORKTREE_SYMLINK_ESCAPE, E_RUN_STATE,
+E_RUN_MARKER_MISSING, E_UNEXPECTED.`
 
 // An undeclared secaudit-run.json inside the target silently drops its whole subtree from
 // enumeration, hashing, and every hunter — a false all-clear. Only the operator can resolve it.

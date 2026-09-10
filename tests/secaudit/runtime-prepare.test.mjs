@@ -47,7 +47,7 @@ assert.strictEqual(readFileSync(join(prep.work, 'app.py'), 'utf8'), 'print(1)\n'
 // Ownership marker: valid, prepared, hash recorded.
 const marker = JSON.parse(readFileSync(join(prep.runDir, 'secaudit-run.json'), 'utf8'))
 assert.strictEqual(marker.marker, 'secaudit-run')
-assert.strictEqual(marker.formatVersion, 1)
+assert.strictEqual(marker.formatVersion, 2)
 assert.strictEqual(marker.runId, prep.runId)
 assert.strictEqual(marker.state, 'prepared')
 assert.strictEqual(marker.corpusSha256, prep.corpusSha256)
