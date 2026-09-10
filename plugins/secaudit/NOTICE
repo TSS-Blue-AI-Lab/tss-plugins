@@ -44,3 +44,14 @@ vulnerability-discovery methodology this pipeline implements. secaudit is not af
 with, endorsed by, or sponsored by Cloudflare, Inc. Claude and Claude Code are trademarks
 of Anthropic, PBC; Codex is a trademark of OpenAI. Use of these names is descriptive and
 implies no endorsement.
+
+
+IBM Plex Sans and IBM Plex Mono
+-------------------------------
+
+The dashboard under skills/issues/ui/ bundles the IBM Plex Sans and IBM Plex Mono webfonts
+(https://github.com/IBM/plex) so the page renders with no network access. They are licensed
+under the SIL Open Font License 1.1; the upstream licence text ships alongside the font files
+at skills/issues/ui/fonts/LICENSE.txt.
+
+Copyright (c) 2017 IBM Corp. with Reserved Font Name "Plex"

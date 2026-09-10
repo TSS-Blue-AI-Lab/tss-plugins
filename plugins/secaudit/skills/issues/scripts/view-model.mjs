@@ -74,6 +74,8 @@ export function detailView(store, issueId) {
   return {
     revision: store.revision,
     issue: { ...issue, latestObservation: latest },
+    // Same source as the card's buttons, so the detail can never offer a rejected move either.
+    allowedActions: ALLOWED[issue.humanState] ?? [],
     sections,
   }
 }

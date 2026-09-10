@@ -2,6 +2,7 @@
 // Routing and request validation only. Every mutation goes through issue-store's applyTransition
 // so the UI can never reach a state the store would refuse, and a conflicting write loses
 // rather than silently overwriting a newer human decision.
+import { basename } from 'node:path'
 import { readStore, writeStore, applyTransition } from './issue-store.mjs'
 import { boardView, archiveView, detailView, runsView, runDetailView } from './view-model.mjs'
 import { discoverRuns } from './run-catalog.mjs'
@@ -39,7 +40,7 @@ export async function handleRequest({ method, url, headers = {}, body, projectRo
   if (method === 'GET') {
     if (transition) return fail(405, 'E_METHOD', 'a transition must be POSTed')
     const store = await readStore(projectRoot)
-    if (path === '/api/board') return ok(boardView(store))
+    if (path === '/api/board') return ok({ ...boardView(store), projectName: basename(projectRoot) })
     if (path === '/api/archive') return ok(archiveView(store))
     if (path === '/api/runs') return ok(runsView(store, await discoverRuns(projectRoot)))
     const runDetail = /^\/api\/runs\/([A-Za-z0-9_.-]+)$/.exec(path)
