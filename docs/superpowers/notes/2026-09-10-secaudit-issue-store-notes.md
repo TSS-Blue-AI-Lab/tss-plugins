@@ -25,3 +25,14 @@ Part 3 Task 6 (not a placeholder) rather than leaving the suite red across two p
 full-pipeline entry points; `issues` is explicit-only for a different reason — it starts a
 long-lived local server — so it got its own `SERVERS` category in that test plus an
 `agents/openai.yaml`, keeping the gate consistent in both clients.
+
+### D3 — `normalizeCodeLine` and `METHODLIKE` needed real implementations, not the plan's
+Two of Task 2's code blocks did not satisfy Task 2's own tests, so the source was fixed rather
+than the tests (as the task instructs).
+1. The plan's `normalizeCodeLine` was `replace(/\s+/g, ' ').trim()`, which collapses whitespace
+   *inside* string literals — contradicting the stated interface ("string literals are
+   preserved verbatim") and the test. Replaced with a quote-aware scan: whitespace collapses
+   outside literals only, since whitespace inside one is part of the value.
+2. `METHODLIKE` matched any call statement, so `return Sql(id);` anchored to `Sql` instead of
+   the enclosing method `Get`. Added a `CONTROL_KEYWORDS` guard on the leading token; without
+   it every call site reads as its own declaration and the anchor stops being stable.
