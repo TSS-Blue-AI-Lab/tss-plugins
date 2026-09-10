@@ -74,6 +74,8 @@
         "impact": { "type": ["string", "null"] },
         "remediation": { "type": ["string", "null"] },
         "dynamicTest": { "type": ["string", "null"] },
+        "suppressed": { "type": "boolean" },
+        "suppressedIssueId": { "type": ["string", "null"] },
         "anchor": {
           "type": ["object", "null"],
           "required": ["version", "anchorKind", "anchorName", "codeHash", "fingerprint"],

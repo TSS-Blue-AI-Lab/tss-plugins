@@ -21,7 +21,11 @@ assert.deepStrictEqual(data.findings.map(classifyFinding), [
   { bucket: 'manual-review', manualKind: 'defect-determination' },
 ])
 assert.deepStrictEqual(summaryFor(data.findings),
-  { confirmed: 1, refuted: 2, manualReview: 2 })
+  { confirmed: 1, refuted: 2, manualReview: 2, dismissed: 0 })
+// A dismissed finding is counted once, as dismissed, and drops out of the actionable buckets.
+assert.deepStrictEqual(
+  summaryFor(data.findings.map((f, i) => (i === 0 ? { ...f, suppressed: true } : f))),
+  { confirmed: 0, refuted: 2, manualReview: 2, dismissed: 1 })
 assert.strictEqual(sortFindings([...data.findings])[0].title, 'Forced mode bypass')
 assert.strictEqual(escapeHtml('<script>&"\''), '&lt;script&gt;&amp;&quot;&#39;')
 assert.strictEqual(formatDate('2026-07-16'), '16 July 2026')

@@ -239,6 +239,10 @@ export async function prepare(options) {
   }
   await writeMarker(runDir, { runId, target, createdUtc: nowIso, state: 'preparing' })
   const degradedSymlinks = await copyWorkTree(target, files, symlinkPlan, work)
+  // Written into the work tree so the Challenge stage can read it, and so it survives the prune
+  // as part of the run's evidence: what was dismissed going in is part of what happened.
+  const { writeKnownIssuesDigest } = await import('../../issues/scripts/known-issues.mjs')
+  const knownIssues = await writeKnownIssuesDigest(artifactRoot, work)
   await writeMarker(runDir, {
     runId,
     target,
@@ -268,6 +272,7 @@ export async function prepare(options) {
     target,
     projectRoot: artifactRoot,
     scope,
+    knownIssues,
     coverage,
     corpusSha256,
     generatedDate,

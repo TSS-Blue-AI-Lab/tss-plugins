@@ -74,6 +74,9 @@ async function makeRun() {
   const work = makeWork(runDir)
   return {
     target, runDir, work,
+    // The publisher reads the marker's projectRoot, falling back to the run directory when a
+    // run records none — which is what these fixtures do.
+    projectRoot: runDir,
     ledgerPath: join(work, 'sast', 'run-ledger.json'),
     corpus: await corpusHash(target),
   }
@@ -347,6 +350,55 @@ assert.match(trace, /sourceFiles|Source files/i, 'trace.md must include coverage
   assert.deepEqual(readdirSync(fixture.work), ['sast'])
 
   console.log('artifact-publisher anchors: ok')
+}
+
+// --- a dismissed identity never reaches the actionable counts --------------
+{
+  const fixture = await makeRun()
+  // Suppress the first finding by the fingerprint the publisher is about to compute for it.
+  const { computeAnchor, fingerprintFor } =
+    await import(join(root, 'skills/issues/scripts/fingerprint.mjs'))
+  const { emptyStore, writeStore } =
+    await import(join(root, 'skills/issues/scripts/issue-store.mjs'))
+  const target = JSON.parse(
+    readFileSync(join(fixture.work, 'sast', 'report-data.json'), 'utf8')).findings[0]
+  const anchor = computeAnchor({
+    sourceText: readFileSync(join(fixture.work, ...target.path.split('/')), 'utf8'),
+    line: target.line,
+    path: target.path,
+  })
+  await writeStore(fixture.projectRoot, {
+    ...emptyStore(),
+    issues: [{
+      id: 'iss_suppressed', class: target.class, path: target.path, line: target.line,
+      title: target.title, severity: null, humanState: 'suppressed', ambiguous: false,
+      fingerprints: [fingerprintFor({ class: target.class, path: target.path, ...anchor })],
+      observations: [], evidence: {}, firstSeenRunId: 'old', lastSeenRunId: 'old',
+      lastHumanUtc: '2026-01-01T00:00:00Z', events: [],
+    }],
+  })
+
+  const summary = await publishArtifacts({
+    target: fixture.target,
+    expectedCorpusSha256: fixture.corpus,
+    work: fixture.work,
+    runDir: fixture.runDir,
+    ledgerPath: fixture.ledgerPath,
+  })
+
+  assert.equal(summary.dismissed, 1)
+  const published = JSON.parse(
+    readFileSync(join(fixture.work, 'sast', 'report-data.json'), 'utf8'))
+  const dismissed = published.findings.find(f => f.suppressed)
+  // Still in the record, with its original verdict — grouped away, not deleted or rewritten.
+  assert.ok(dismissed)
+  assert.equal(dismissed.suppressedIssueId, 'iss_suppressed')
+  assert.equal(dismissed.challengeVerdict, target.challengeVerdict)
+  // And it is not counted among the findings the operator is being asked to act on.
+  assert.equal(summary.confirmed + summary.refuted + summary.manualReview,
+    published.findings.length - 1)
+
+  console.log('artifact-publisher dismissal: ok')
 }
 
 console.log('PASS artifact-publisher')

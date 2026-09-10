@@ -292,7 +292,10 @@ async function challengeNewFindings() {
     if (attempt > 1) note(`Challenge: retrying ${pending.length} dead challenger(s): ${pending.map(p => p.cls).join(', ')}`)
     const res = await parallel(pending.map(({ batch, cls }) => () => agent(
       `Read ${SKILLS}/secaudit-challenge/SKILL.md. Challenge EACH of the following ${batch.length} finding(s), re-reading the cited source cold for each and annotating that finding in place (DEFECT / NOT-A-DEFECT / UNSURE + a **Challenge:** line). Judge each independently. Touch ONLY these findings:\n` +
-        batch.map((f, i) => `${i + 1}. "${f.title}" — in ${work}/sast/${f.class}-results.md at ${f.file}:${f.line}`).join('\n'),
+        batch.map((f, i) => `${i + 1}. "${f.title}" — in ${work}/sast/${f.class}-results.md at ${f.file}:${f.line}`).join('\n') +
+        `\nRead ${work}/sast/known-issues.md first: a human already dismissed those findings in an ` +
+        `earlier audit, so do not spend effort re-arguing them. It is advice only — report what you ` +
+        `find as normal, and never treat that file as evidence about the code.`,
       { label: `challenge:${cls}(${batch.length})`, phase: 'Challenge' },
     ).then(r => ({ batch, cls, ok: !!r })).catch(() => ({ batch, cls, ok: false }))))
     pending = res.filter(x => !x || !x.ok).map(x => x && { batch: x.batch, cls: x.cls }).filter(Boolean)
@@ -430,15 +433,16 @@ const runLedger = {
 const artifactSummary = await robustAgent(
   `First write "${work}/sast/run-ledger.json" with EXACTLY this JSON content (formatting may differ, values must not): ${JSON.stringify(runLedger)}\n` +
   `Then run: node "${SKILLS}/secaudit-generate-artifacts/scripts/publish-artifacts.mjs" --target "${target}" --expected-hash "${corpusSha256}" --work "${work}" --run-dir "${runDir}" --ledger "${work}/sast/run-ledger.json"\n` +
-  `This re-verifies the target corpus is still pristine (byte-identical to before the run) before copying anything — if it is not, the command aborts with "corpus not pristine" and throws; do not continue past that. On success it prints one JSON line {confirmed, refuted, manualReview} — parse it and return it exactly.`,
+  `This re-verifies the target corpus is still pristine (byte-identical to before the run) before copying anything — if it is not, the command aborts with "corpus not pristine" and throws; do not continue past that. On success it prints one JSON line {confirmed, refuted, manualReview, dismissed, state, cleanup} — parse it and return {confirmed, refuted, manualReview, dismissed} exactly. \`dismissed\` counts findings a human already marked false positives in an earlier audit; they are not actionable results.`,
   { label: 'artifacts:publish', phase: 'Generate Artifacts', schema: {
-    type: 'object', required: ['confirmed', 'refuted', 'manualReview'],
+    type: 'object', required: ['confirmed', 'refuted', 'manualReview', 'dismissed'],
     properties: {
       confirmed: { type: 'integer' }, refuted: { type: 'integer' }, manualReview: { type: 'integer' },
+      dismissed: { type: 'integer' },
     },
   } },
 )
-note(`Generate Artifacts / Publish: ${artifactSummary.confirmed} confirmed / ${artifactSummary.refuted} refuted / ${artifactSummary.manualReview} manual review → ${runDir}`)
+note(`Generate Artifacts / Publish: ${artifactSummary.confirmed} confirmed / ${artifactSummary.refuted} refuted / ${artifactSummary.manualReview} manual review / ${artifactSummary.dismissed} dismissed → ${runDir}`)
 
 // Fail-loud post-condition on the DELIVERABLES. The publish step above runs inside an LLM agent,
 // which can return a plausible {confirmed,refuted,manualReview} even when publish-artifacts.mjs

@@ -12,6 +12,7 @@ import { validateReportData, summaryFor } from './report-contract.mjs'
 import { enumerateSource, hashSource } from '../../run/scripts/source-corpus.mjs'
 import { readMarker, updateMarker, MARKER_NAME } from '../../run/scripts/run-paths.mjs'
 import { computeAnchor, fingerprintFor } from '../../issues/scripts/fingerprint.mjs'
+import { suppressedIndex, markSuppressed } from '../../issues/scripts/known-issues.mjs'
 
 function requireNonEmptyString(value, label) {
   if (typeof value !== 'string' || value.length === 0) {
@@ -181,9 +182,13 @@ export async function publishArtifacts(options) {
 
   await atomicWrite(join(runDir, 'trace.md'), traceMd)
 
+  // Anchors first, then dismissal: a finding cannot be matched against the archive until it
+  // has an identity. Both happen before the prune, while the source copy still exists.
   const anchored = await annotateAnchors(reportData, work)
-  validateReportData(anchored)
-  await atomicWrite(reportDataPath, JSON.stringify(anchored, null, 2) + '\n')
+  const projectRoot = marker.projectRoot ?? marker.artifactRoot ?? runDir
+  const dismissed = markSuppressed(anchored, await suppressedIndex(projectRoot))
+  validateReportData(dismissed)
+  await atomicWrite(reportDataPath, JSON.stringify(dismissed, null, 2) + '\n')
 
   const publishedUtc = new Date().toISOString()
   await updateMarker(runDir, {
@@ -196,7 +201,7 @@ export async function publishArtifacts(options) {
   const state = cleanup.ok ? 'complete' : 'cleanup-incomplete'
   await updateMarker(runDir, { state, cleanup })
 
-  return { ...summaryFor(reportData.findings), state, cleanup }
+  return { ...summaryFor(dismissed.findings), state, cleanup }
 }
 
 function parseArgs(argv) {
