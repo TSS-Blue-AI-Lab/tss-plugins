@@ -5,7 +5,7 @@
 import { readFile, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { readMarker } from '../../run/scripts/run-paths.mjs'
-import { validateReportData } from '../../secaudit-generate-artifacts/scripts/report-contract.mjs'
+import { validateReportData, classifyFinding } from '../../secaudit-generate-artifacts/scripts/report-contract.mjs'
 import { legacyFingerprintFor } from './fingerprint.mjs'
 
 async function isFile(path) {
@@ -42,6 +42,9 @@ function toObservation(finding, runId) {
     dynamicTest: finding.dynamicTest ?? null,
     fingerprint: anchored ?? legacyFingerprintFor(finding),
     fingerprintKind: anchored ? 'anchor' : 'legacy',
+    // The audit's own verdict bucket: confirmed, refuted, or manual-review. The board uses it
+    // to keep refuted findings out of the triage inbox without re-deriving the rule.
+    bucket: classifyFinding(finding).bucket,
   }
 }
 

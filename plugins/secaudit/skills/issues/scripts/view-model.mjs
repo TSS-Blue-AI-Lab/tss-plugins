@@ -37,6 +37,8 @@ export function toCard(issue) {
     title: issue.title,
     severity: issue.severity,          // null stays null: a missing severity is not invented
     ambiguous: Boolean(issue.ambiguous),
+    // 'human' (a reviewer dismissed it) or 'audit' (the audit refuted it); null on the board.
+    suppressedBy: issue.humanState === 'suppressed' ? (issue.suppressedBy ?? 'human') : null,
     observationCount: issue.observations.length,
     lastSeenRunId: issue.lastSeenRunId,
     allowedActions: ALLOWED[issue.humanState] ?? [],

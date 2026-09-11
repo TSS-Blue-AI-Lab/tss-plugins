@@ -12,6 +12,10 @@ export async function suppressedIndex(projectRoot) {
   const index = new Map()
   for (const issue of store.issues) {
     if (issue.humanState !== 'suppressed') continue
+    // Only a human dismissal suppresses a finding at publication. An audit refutation is
+    // already reported as refuted; marking it dismissed as well would move it out of the
+    // refuted count and claim a person reviewed something nobody did.
+    if (issue.suppressedBy === 'audit') continue
     for (const fingerprint of issue.fingerprints) {
       index.set(fingerprint, {
         issueId: issue.id,

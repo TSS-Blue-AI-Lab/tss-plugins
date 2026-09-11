@@ -40,7 +40,8 @@ assert.equal(first.store.issues.length, 2)
 
 // Syncing again reports nothing new: the board must not present old findings as fresh.
 const second = await syncProject(project)
-assert.deepEqual(second.summary, { new: 0, repeat: 0, reopened: 0, suppressed: 0, ambiguous: 0 })
+assert.deepEqual(second.summary,
+  { new: 0, repeat: 0, reopened: 0, suppressed: 0, ambiguous: 0, refuted: 0, unrefuted: 0 })
 assert.equal(second.store.issues.length, 2)
 
 // A broken run is listed as unavailable and does not stop the others.

@@ -8,7 +8,8 @@ import { discoverRuns } from './run-catalog.mjs'
 import { importRun } from './run-import.mjs'
 import { readStore, writeStore, ingestRun } from './issue-store.mjs'
 
-const EMPTY_SUMMARY = () => ({ new: 0, repeat: 0, reopened: 0, suppressed: 0, ambiguous: 0 })
+const EMPTY_SUMMARY = () =>
+  ({ new: 0, repeat: 0, reopened: 0, suppressed: 0, ambiguous: 0, refuted: 0, unrefuted: 0 })
 
 export async function syncProject(projectRoot) {
   const imported = []

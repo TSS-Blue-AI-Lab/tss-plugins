@@ -121,3 +121,41 @@ assert.equal(reloaded.issues.length, store.issues.length)
 assert.equal(reloaded.revision, written.revision)
 
 console.log('issues-store: ok')
+
+// A finding the audit refuted opens in the archive, marked as the AUDIT's doing. It needs no
+// human triage, so it must never occupy the inbox.
+let audit = ingestRun(emptyStore(), run('r1', '2026-01-01T00:00:00Z', [obs({
+  observationId: 'idor@b.py:2@refuted', class: 'idor', path: 'b.py', line: 2,
+  title: 'Archive lookup exposure', severity: null, traceVerdict: 'UNREACHABLE',
+  bucket: 'refuted', fingerprint: 'fp1:' + '2'.repeat(24),
+})]))
+assert.equal(audit.outcomes[0].outcome, 'refuted')
+assert.equal(audit.store.issues[0].humanState, 'suppressed')
+assert.equal(audit.store.issues[0].suppressedBy, 'audit')
+
+// An audit refutation is provisional: a later run that stops refuting the same defect returns
+// it to the inbox. Anything else buries a real finding behind a verdict the audit withdrew.
+const unrefuted = ingestRun(audit.store, run('r2', '2026-02-01T00:00:00Z', [obs({
+  observationId: 'idor@b.py:2@reachable', class: 'idor', path: 'b.py', line: 2, runId: 'r2',
+  title: 'Archive lookup exposure', severity: 'High', traceVerdict: 'REACHABLE',
+  bucket: 'confirmed', fingerprint: 'fp1:' + '2'.repeat(24),
+})]))
+assert.equal(unrefuted.outcomes[0].outcome, 'unrefuted')
+assert.equal(unrefuted.store.issues[0].humanState, 'inbox')
+assert.equal(unrefuted.store.issues[0].suppressedBy, null)
+
+// A HUMAN dismissal is absolute by contrast: the same re-observation leaves it archived.
+let dismissed = applyTransition(audit.store, { issueId: audit.store.issues[0].id,
+  action: 'restore', revision: audit.store.revision, utc: '2026-01-05T00:00:00Z' }).store
+dismissed = applyTransition(dismissed, { issueId: dismissed.issues[0].id,
+  action: 'false-positive', revision: dismissed.revision, utc: '2026-01-06T00:00:00Z' }).store
+assert.equal(dismissed.issues[0].suppressedBy, 'human')
+const stillDismissed = ingestRun(dismissed, run('r3', '2026-03-01T00:00:00Z', [obs({
+  observationId: 'idor@b.py:2@reachable2', class: 'idor', path: 'b.py', line: 2, runId: 'r3',
+  title: 'Archive lookup exposure', severity: 'High', traceVerdict: 'REACHABLE',
+  bucket: 'confirmed', fingerprint: 'fp1:' + '2'.repeat(24),
+})]))
+assert.equal(stillDismissed.outcomes[0].outcome, 'suppressed')
+assert.equal(stillDismissed.store.issues[0].humanState, 'suppressed')
+
+console.log('issues-store audit refutation: ok')

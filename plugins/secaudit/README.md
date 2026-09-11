@@ -138,7 +138,10 @@ The server binds to `127.0.0.1` only, serves one project, and stops with Ctrl-C.
 itself is a static page — no build step, no CDN, no network at runtime; IBM Plex ships with it.
 
 Decisions live in `<project-root>/.secaudit/issues.json` and are the only thing that moves a
-card. Findings are matched across runs by a code anchor rather than by title or line number, so
+card between the three board columns. Findings the audit refuted — Challenge said
+`NOT-A-DEFECT`, or Trace said `UNREACHABLE` — never reach the inbox at all: they open in the
+archive marked as the audit's own verdict, and return to the inbox by themselves if a later run
+stops refuting them. Only a human dismissal is permanent. Findings are matched across runs by a code anchor rather than by title or line number, so
 the same defect stays one card as the file changes around it. A finding marked a false positive
 is archived and suppressed at publication time in every later run until someone restores it; a
 finding that simply stops appearing is never marked done, because scope and coverage differ

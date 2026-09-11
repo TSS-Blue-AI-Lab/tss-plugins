@@ -140,14 +140,20 @@ function issueCard(card, stage) {
     el('div', 'issue-title', card.title),
     el('div', 'issue-path', card.path + (card.line ? ':' + card.line : '')),
   )
+  // A refuted finding, and one awaiting a defect determination, carry severity: null by
+  // contract. That cell stays empty rather than holding an invented label — the register's
+  // severity column is 67px wide and any stand-in text runs into its neighbours.
+  if (card.suppressedBy === 'audit') copy.append(el('div', 'issue-path', 'Refuted by the audit'))
+  else if (card.suppressedBy === 'human') copy.append(el('div', 'issue-path', 'Dismissed by a reviewer'))
+  if (card.ambiguous) copy.append(el('div', 'issue-path', 'Identity needs a merge decision'))
   node.append(
     el('span', 'issue-id mono', card.id),
     copy,
     el('span', 'issue-class', card.class),
-    el('span', 'severity' + (card.severity === 'High' ? ' high' : ''),
-      card.severity ?? 'Severity not stated'),
+    card.severity
+      ? el('span', 'severity' + (card.severity === 'High' ? ' high' : ''), card.severity)
+      : el('span', 'severity-empty'),
   )
-  if (card.ambiguous) node.append(el('span', 'issue-class', 'needs a merge decision'))
   wireDragAndDrop(node, card, stage)
   return node
 }
@@ -182,8 +188,10 @@ async function renderArchive() {
   const content = q('#content')
   content.replaceChildren()
   content.append(el('p', 'intro archive-intro',
-    'Dismissed by a reviewer. Matching observations stay out of future audit inboxes unless '
-    + 'explicitly restored.'))
+    'Findings that need no triage. A reviewer dismissed some of them: those stay out of every '
+    + 'future audit inbox, and are suppressed in later reports, until explicitly restored. The '
+    + 'audit refuted the rest; if a later run stops refuting one, it returns to the inbox on '
+    + 'its own.'))
   const list = el('div', 'register')
   list.append(lane('suppressed', data.cards))
   content.append(list)
@@ -390,7 +398,10 @@ async function renderDetail(issueId) {
     meta.append(el('span', 'severity' + (issue.severity === 'High' ? ' high' : ''), issue.severity))
   }
   // The audit verdict and the human state are different facts and must read as different facts.
-  meta.append(el('span', '', 'Workflow: ' + (LABELS[issue.humanState] ?? issue.humanState)))
+  const workflow = issue.humanState === 'suppressed' && (issue.suppressedBy ?? 'human') === 'audit'
+    ? 'Refuted by the audit'
+    : (LABELS[issue.humanState] ?? issue.humanState)
+  meta.append(el('span', '', 'Workflow: ' + workflow))
   header.append(meta, el('h1', 'detail-title', issue.title))
 
   const actions = el('div', 'detail-actions')

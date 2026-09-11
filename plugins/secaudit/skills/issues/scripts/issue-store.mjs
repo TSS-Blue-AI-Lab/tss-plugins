@@ -59,6 +59,13 @@ function findMatch(issues, observation) {
 
 const withEvent = (issue, event) => ({ ...issue, events: [...issue.events, event] })
 
+// Two different things can archive an issue and they are NOT interchangeable. A human
+// dismissal is absolute: it survives every later run and suppresses the finding at publication.
+// An audit refutation is provisional: it is the audit's latest word, and the moment a later run
+// stops refuting the same defect it returns to the inbox. Collapsing the two would either
+// re-raise dismissed findings or silently bury a defect nobody reviewed.
+const suppressedByOf = issue => issue.suppressedBy ?? 'human'
+
 function attach(issue, observation, runCreatedUtc) {
   const next = {
     ...issue,
@@ -79,6 +86,15 @@ function attach(issue, observation, runCreatedUtc) {
     lastSeenRunId: observation.runId,
   }
   if (issue.humanState === 'suppressed') {
+    if (suppressedByOf(issue) === 'audit' && observation.bucket !== 'refuted') {
+      return {
+        issue: withEvent({ ...next, humanState: 'inbox', suppressedBy: null }, {
+          utc: runCreatedUtc, actor: 'system', type: 'no-longer-refuted',
+          from: 'suppressed', to: 'inbox', runId: observation.runId,
+        }),
+        outcome: 'unrefuted',
+      }
+    }
     return {
       issue: withEvent(next, { utc: runCreatedUtc, actor: 'system', type: 'suppressed-match', runId: observation.runId }),
       outcome: 'suppressed',
@@ -103,6 +119,9 @@ function attach(issue, observation, runCreatedUtc) {
 }
 
 function createIssue(observation, runCreatedUtc, ambiguous) {
+  // A finding the audit refuted needs no human triage, so it opens in the archive rather than
+  // the inbox — marked as the audit's doing, not a reviewer's.
+  const refuted = observation.bucket === 'refuted'
   return {
     id: issueIdFor(observation),
     class: observation.class,
@@ -110,7 +129,8 @@ function createIssue(observation, runCreatedUtc, ambiguous) {
     line: observation.line,
     title: observation.title,
     severity: observation.severity ?? null,
-    humanState: 'inbox',
+    humanState: refuted ? 'suppressed' : 'inbox',
+    suppressedBy: refuted ? 'audit' : null,
     ambiguous,
     fingerprints: [observation.fingerprint],
     observations: [{
@@ -122,7 +142,11 @@ function createIssue(observation, runCreatedUtc, ambiguous) {
     firstSeenRunId: observation.runId,
     lastSeenRunId: observation.runId,
     lastHumanUtc: null,
-    events: [{ utc: runCreatedUtc, actor: 'system', type: 'observed', runId: observation.runId }],
+    events: [{
+      utc: runCreatedUtc, actor: 'system',
+      type: refuted ? 'refuted-by-audit' : 'observed',
+      runId: observation.runId,
+    }],
   }
 }
 
@@ -145,7 +169,7 @@ export function ingestRun(store, importedRun) {
       outcomes.push({
         observationId: observation.observationId,
         issueId: created.id,
-        outcome: ambiguous ? 'ambiguous' : 'new',
+        outcome: ambiguous ? 'ambiguous' : created.humanState === 'suppressed' ? 'refuted' : 'new',
       })
       continue
     }
@@ -188,7 +212,10 @@ export function applyTransition(store, { issueId, action, revision, utc }) {
     err.code = 'E_TRANSITION'
     throw err
   }
-  const updated = withEvent({ ...issue, humanState: to, lastHumanUtc: utc },
+  // A human touching the archive takes ownership of it either way: dismissing marks the
+  // suppression as theirs (and so absolute), restoring clears it.
+  const suppressedBy = to === 'suppressed' ? 'human' : null
+  const updated = withEvent({ ...issue, humanState: to, suppressedBy, lastHumanUtc: utc },
     { utc, actor: 'human', type: action, from: issue.humanState, to })
   return { store: { ...store, issues: store.issues.map(i => (i.id === issueId ? updated : i)) } }
 }

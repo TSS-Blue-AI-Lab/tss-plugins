@@ -73,3 +73,36 @@ verified instead: the parity test's measurements and security properties, that e
 (page, CSS, module, fonts, licence) is served with the right content type and a strict CSP,
 and that the rebuilt stylesheet is the prototype's own rules with only the `fieldnotes` theme
 and the inlined fonts removed.
+
+### D10 — Refuted findings are archived by the audit, not triaged by a human
+
+Reported by the user against the running board: refuted findings were sitting in the inbox.
+`run-import.mjs` mapped every finding in `report-data.json` into an observation with no regard
+for `classifyFinding`, so a `NOT-A-DEFECT` or `UNREACHABLE` verdict still demanded human
+triage — against the spec's "the inbox is observations requiring human triage". No plan task
+covered this; the user chose "import, auto-archive" from three options.
+
+What changed: observations now carry the audit's `bucket`; a refuted observation creates an
+issue in `suppressed` with `suppressedBy: 'audit'`. Two rules keep that distinct from a human
+dismissal, which is what makes auto-archiving safe:
+
+- A human dismissal is absolute — it suppresses the finding at publication in every later run
+  and only an explicit Restore lifts it. `suppressedIndex` therefore skips `suppressedBy:
+  'audit'` issues: marking a refuted finding "dismissed" in a report would move it out of the
+  refuted count and imply a review nobody did.
+- An audit refutation is provisional. The moment a later run observes the same fingerprint
+  without refuting it, the issue returns to the inbox (`unrefuted`). Without that, a defect the
+  audit once called unreachable would stay buried after the audit changed its mind.
+
+Existing board issues are NOT auto-archived when a later run refutes them — a card a human has
+already seen stays where it is. Only newly created issues open in the archive.
+
+### D11 — Register cells overlapped on the archive and run-detail pages
+
+Also reported against the running board. The flat register lays cards out on a fixed
+`76px 1fr 115px 67px 16px` grid, and I had filled the 67px severity cell with the invented
+string "Severity not stated" whenever severity was null — which, by the report contract, is
+exactly every refuted and defect-determination finding. The cell now stays empty (no invented
+label), the ambiguity flag moved inside the title cell instead of becoming a fifth grid child,
+and the register's id/class/severity cells got `min-width:0` plus wrapping so real class names
+cannot push into their neighbours.

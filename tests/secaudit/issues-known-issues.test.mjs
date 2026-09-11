@@ -79,3 +79,27 @@ assert.equal(marked.findings[1].suppressed, false)
 assert.equal(marked.findings[2].suppressed, false)
 
 console.log('issues-known-issues: ok')
+
+// Publication-time suppression is a HUMAN guarantee. An audit refutation is already reported
+// as refuted; claiming it dismissed would move it out of the refuted count and imply a review
+// that never happened.
+{
+  const { emptyStore: empty, ingestRun: ingest, writeStore: write } =
+    await import(join(scripts, 'issue-store.mjs'))
+  const root = mkdtempSync(join(tmpdir(), 'secaudit refuted-'))
+  const store = ingest(empty(), {
+    runId: 'r1', runDir: '/x/r1', createdUtc: '2026-01-01T00:00:00Z', target: '/p', scope: [],
+    status: 'ok',
+    observations: [{
+      observationId: 'o1', runId: 'r1', class: 'idor', path: 'b.py', line: 2,
+      title: 'Archive lookup exposure', severity: null, challengeVerdict: 'DEFECT',
+      challengeReason: 'reachable only from a removed route', traceVerdict: 'UNREACHABLE',
+      traceEvidence: 'no route reaches it', impact: null, remediation: null, dynamicTest: null,
+      fingerprint: 'fp1:' + '2'.repeat(24), fingerprintKind: 'anchor', bucket: 'refuted',
+    }],
+  }).store
+  assert.equal(store.issues[0].humanState, 'suppressed')
+  await write(root, store)
+  assert.equal((await suppressedIndex(root)).size, 0)
+  console.log('issues-known-issues audit refutation: ok')
+}

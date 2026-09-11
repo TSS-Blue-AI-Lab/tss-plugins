@@ -474,3 +474,8 @@ body.workbench{height:100dvh;overflow:hidden;overscroll-behavior:none}
 
 /* The lane list is the only scrolling region on the board. Named so the parity test can see it. */
 .column-body{overflow-y:auto;overscroll-behavior:contain}
+
+/* The flat register (archive, run detail) lays cards out in fixed columns, so its cells must
+   never push into one another: real class names and IDs are longer than the prototype's. */
+.workbench .issue-id,.workbench .issue-class,.workbench .severity{min-width:0;overflow-wrap:anywhere}
+.workbench .issue-copy{min-width:0}

@@ -33,8 +33,10 @@ before doing anything else.
 node "<PLUGIN_ROOT>/skills/issues/scripts/sync.mjs" --project "<project>"
 ```
 
-Report `summary` verbatim: `new`, `repeat`, `reopened`, `suppressed`, `ambiguous`. A `repeat` is
-not a new finding. Name every `unavailable` run and its reason.
+Report `summary` verbatim: `new`, `repeat`, `reopened`, `suppressed`, `ambiguous`, `refuted`,
+`unrefuted`. A `repeat` is not a new finding. A `refuted` went straight to the archive on the
+audit's own verdict and was never in anyone's inbox. An `unrefuted` is a finding a later run
+stopped refuting, so it is now awaiting triage. Name every `unavailable` run and its reason.
 
 ## Step 3 — serve
 
@@ -51,5 +53,8 @@ loopback only and serves one project. Tell the user to stop it with Ctrl-C when 
   human confirmation.
 - A finding a human marked a false positive is archived and never raised again by a later audit.
   Only an explicit Restore returns it to the inbox.
+- A finding the AUDIT refuted is archived too, but provisionally: it is labelled as the audit's
+  verdict, it is not suppressed in later reports, and a later run that stops refuting it puts it
+  back in the inbox. Only human dismissals are absolute.
 - A finding that stops appearing is NOT marked done: scope and coverage differ between runs.
 - Historical reports are unchanged by anything done on the board.
