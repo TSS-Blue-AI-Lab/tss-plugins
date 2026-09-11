@@ -7,8 +7,9 @@ import { readFile, writeFile, rename } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
 import { join, dirname } from 'node:path'
 import { ensureIgnoredDir } from './run-catalog.mjs'
+import { classifyFinding } from '../../secaudit-generate-artifacts/scripts/report-contract.mjs'
 
-export const STORE_VERSION = 1
+export const STORE_VERSION = 2
 
 export function storePath(projectRoot) {
   return join(projectRoot, '.secaudit', 'issues.json')
@@ -220,14 +221,65 @@ export function applyTransition(store, { issueId, action, revision, utc }) {
   return { store: { ...store, issues: store.issues.map(i => (i.id === issueId ? updated : i)) } }
 }
 
+// v1 stores predate the rule that a finding the AUDIT refuted is archived rather than queued
+// for triage, so they hold refuted findings in the inbox. Two guards keep this from doing harm:
+// an issue a human has already decided about is never touched (lastHumanUtc is set by
+// applyTransition and nothing else), and an issue whose evidence was not retained cannot be
+// classified, so it stays exactly where it is rather than being guessed at.
+function migrateV1ToV2(store) {
+  return {
+    ...store,
+    issues: store.issues.map(issue => {
+      if (issue.humanState !== 'inbox' || issue.lastHumanUtc) return issue
+      const last = issue.observations[issue.observations.length - 1]
+      const evidence = issue.evidence?.[last?.observationId]
+      if (!evidence) return issue
+      let bucket
+      try {
+        bucket = classifyFinding(evidence).bucket
+      } catch {
+        return issue                      // an unclassifiable record is not a refutation
+      }
+      if (bucket !== 'refuted') return issue
+      return withEvent({ ...issue, humanState: 'suppressed', suppressedBy: 'audit' }, {
+        utc: null, actor: 'system', type: 'refuted-by-audit',
+        from: 'inbox', to: 'suppressed', migration: 'v1->v2',
+      })
+    }),
+  }
+}
+
+// Keyed by the version each migration upgrades FROM. Applied in order, in memory, on every
+// read; the result reaches disk the next time something actually mutates the store. Adding a
+// shape change means bumping STORE_VERSION and adding one entry here — not writing a new
+// shape-sniffing heuristic, and never asking anyone to delete their board.
+const MIGRATIONS = new Map([[1, migrateV1ToV2]])
+
+export function migrateStore(store) {
+  let current = store
+  while (current.storeVersion < STORE_VERSION) {
+    const migrate = MIGRATIONS.get(current.storeVersion)
+    if (!migrate) {
+      throw new Error('no migration from issue store version ' + current.storeVersion)
+    }
+    current = { ...migrate(current), storeVersion: current.storeVersion + 1 }
+  }
+  return current
+}
+
 export async function readStore(projectRoot) {
   const raw = await readFile(storePath(projectRoot), 'utf8').catch(() => null)
   if (raw == null) return emptyStore()
   const parsed = JSON.parse(raw)
-  if (parsed?.storeVersion !== STORE_VERSION) {
-    throw new Error('unsupported issue store version: ' + parsed?.storeVersion)
+  const version = parsed?.storeVersion
+  if (!Number.isInteger(version) || version < 1) {
+    throw new Error('unsupported issue store version: ' + version)
   }
-  return parsed
+  if (version > STORE_VERSION) {
+    throw new Error('issue store version ' + version + ' was written by a newer secaudit; '
+      + 'upgrade the plugin rather than downgrading the store')
+  }
+  return migrateStore(parsed)
 }
 
 // Atomic and revision-bumping. A caller that read revision N and writes back N is the only
@@ -235,7 +287,7 @@ export async function readStore(projectRoot) {
 export async function writeStore(projectRoot, store) {
   const path = storePath(projectRoot)
   await ensureIgnoredDir(dirname(path))
-  const next = { ...store, revision: store.revision + 1 }
+  const next = { ...store, storeVersion: STORE_VERSION, revision: store.revision + 1 }
   const tmp = path + '.tmp'
   await writeFile(tmp, JSON.stringify(next, null, 2) + '\n', 'utf8')
   await rename(tmp, path)

@@ -141,11 +141,22 @@ Decisions live in `<project-root>/.secaudit/issues.json` and are the only thing 
 card between the three board columns. Findings the audit refuted — Challenge said
 `NOT-A-DEFECT`, or Trace said `UNREACHABLE` — never reach the inbox at all: they open in the
 archive marked as the audit's own verdict, and return to the inbox by themselves if a later run
-stops refuting them. Only a human dismissal is permanent. Findings are matched across runs by a code anchor rather than by title or line number, so
-the same defect stays one card as the file changes around it. A finding marked a false positive
+stops refuting them. Only a human dismissal is permanent.
+
+Findings are matched across runs by a code anchor rather than by title or line number, so the
+same defect stays one card as the file changes around it. A finding marked a false positive
 is archived and suppressed at publication time in every later run until someone restores it; a
 finding that simply stops appearing is never marked done, because scope and coverage differ
 between runs. Nothing done on the board changes a historical run's report.
+
+Upgrading secaudit never asks you to re-run an audit or delete your board. The store carries a
+version, and a newer plugin migrates an older store in memory as it reads it, writing the new
+shape back the next time you actually change something. Migrations never overrule a decision a
+person made, and never invent a verdict for a finding whose evidence was not retained. Old run
+directories import as they always did: pre-anchor findings get a `legacy1:` identity and are
+flagged for an explicit merge decision rather than being guessed into an existing issue.
+Downgrading is the one direction that does not work — an older plugin refuses a store newer
+than it understands, rather than silently discarding the fields it does not know about.
 
 ## Limitations
 
