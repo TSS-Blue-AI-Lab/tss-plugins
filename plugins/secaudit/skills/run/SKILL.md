@@ -239,8 +239,8 @@ Then bring the persistent board up to date and report what this run actually cha
 node "<PLUGIN_ROOT>/skills/issues/scripts/sync.mjs" --project "<projectRoot>"
 ```
 
-Report its five summary numbers verbatim — `new`, `repeat`, `reopened`, `suppressed`,
-`ambiguous` — under these rules:
+Report its seven summary numbers verbatim — `new`, `repeat`, `reopened`, `suppressed`,
+`ambiguous`, `refuted`, `unrefuted` — under these rules:
 
 - A `repeat` is a finding the board already knows about. Never describe it as new.
 - `suppressed` counts observations matching an issue a human already marked a false positive.
@@ -248,6 +248,11 @@ Report its five summary numbers verbatim — `new`, `repeat`, `reopened`, `suppr
 - `reopened` counts issues a human had marked done that this run found again.
 - `ambiguous` counts observations whose cross-run identity could not be established with
   confidence; they need an explicit human merge decision on the board.
+- `refuted` counts findings this run reported that the audit itself refuted — Challenge said
+  `NOT-A-DEFECT`, or Trace said `UNREACHABLE`. They go straight to the board's archive on the
+  audit's own verdict and are never anyone's triage work.
+- `unrefuted` counts issues an earlier run had refuted that this run observed without refuting.
+  They are back in the inbox and do need triage.
 - Name every `unavailable` run and its reason rather than omitting it.
 
 Open the board with `secaudit:issues` to triage.
