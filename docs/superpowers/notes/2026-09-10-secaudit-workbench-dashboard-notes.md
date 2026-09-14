@@ -68,7 +68,8 @@ testing.
 Task 6 requires a side-by-side visual comparison in a browser. Headless Chrome
 (`/Applications/Google Chrome.app`) hangs before producing a screenshot here, and there is no
 other browser or automation driver installed, so the visual half of the verification is
-OUTSTANDING and must be done by a human against `output/secaudit-workbench.html`. What was
+OUTSTANDING and must be done by a human against `output/secaudit-workbench.html`. CLOSED on
+2026-09-14: the user ran that pass against the live board and accepted it, after the release. What was
 verified instead: the parity test's measurements and security properties, that every asset
 (page, CSS, module, fonts, licence) is served with the right content type and a strict CSP,
 and that the rebuilt stylesheet is the prototype's own rules with only the `fieldnotes` theme
