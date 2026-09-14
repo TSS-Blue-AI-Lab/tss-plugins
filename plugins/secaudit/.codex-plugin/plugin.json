@@ -1,7 +1,7 @@
 {
   "name": "secaudit",
-  "version": "0.1.0",
-  "description": "Agentic source-code security audit: Recon, one Hunter per vulnerability class, adversarial Challenge, optional Blindspot Sweep, Dedupe, reachability Trace, and deterministic report publication. Runs against any local repository; never mutates the target.",
+  "version": "0.2.0",
+  "description": "Agentic source-code security audit: Recon, one Hunter per vulnerability class, adversarial Challenge, optional Blindspot Sweep, Dedupe, reachability Trace, and deterministic report publication, plus a local triage workbench that carries findings across runs. Runs against any local repository; never mutates the target.",
   "author": {
     "name": "dani-mezei"
   },

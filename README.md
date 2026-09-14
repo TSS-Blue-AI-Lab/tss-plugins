@@ -8,7 +8,7 @@ folders.
 
 | Plugin | Description |
 |---|---|
-| [secaudit](plugins/secaudit/) | Agentic source-code security audit: Recon → Hunt → Challenge → Dedupe → Trace → report generation. Deterministic Node runtime, never mutates the target repo. |
+| [secaudit](plugins/secaudit/) | Agentic source-code security audit: Recon → Hunt → Challenge → Dedupe → Trace → report generation, plus a local triage workbench for the findings. Deterministic Node runtime, never mutates the target repo. |
 | [robin](plugins/robin/) | Skills for the whole build: `blindspot-pass`, `strawman` and `interview-me` before implementation, `quiz-me` after, and a Claude Code hook that keeps implementation notes during. |
 
 ## Install

@@ -179,7 +179,8 @@ than it understands, rather than silently discarding the fields it does not know
 What ships when you install the plugin:
 
 - `skills/` — the canonical skill tree for both clients: `run` (launcher), `sast-analysis` +
-  `sast-hunter-*` (detection library), `secaudit-*` (pipeline stages), and the deterministic
+  `sast-hunter-*` (detection library), `secaudit-*` (pipeline stages), `issues` (the workbench:
+  issue store, server, and its static page under `skills/issues/ui/`), and the deterministic
   runtime under `skills/run/scripts/`
 - `workflows/secaudit.js` — the deterministic Claude Code workflow spine
 - `.claude-plugin/plugin.json`, `.codex-plugin/plugin.json` — per-client plugin manifests
