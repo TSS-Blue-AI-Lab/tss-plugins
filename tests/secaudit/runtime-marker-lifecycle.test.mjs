@@ -2,15 +2,17 @@
 import { mkdtempSync, writeFileSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import assert from 'node:assert'
 
 const scripts = join(dirname(fileURLToPath(import.meta.url)), '..', '..',
   'plugins', 'secaudit', 'skills', 'run', 'scripts')
+// Windows: an absolute path is not a valid ESM specifier, so dynamic import takes a URL.
+const script = name => import(pathToFileURL(join(scripts, name)).href)
 const {
   readMarker, writeMarker, updateMarker, assertTransition,
   MARKER_FORMAT_VERSION, RuntimeError,
-} = await import(join(scripts, 'run-paths.mjs'))
+} = await script('run-paths.mjs')
 
 const dir = mkdtempSync(join(tmpdir(), 'secaudit marker-'))
 

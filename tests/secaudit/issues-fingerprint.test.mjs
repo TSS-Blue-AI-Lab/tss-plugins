@@ -1,12 +1,14 @@
 // tests/secaudit/issues-fingerprint.test.mjs
 import { join, dirname } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import assert from 'node:assert'
 
 const scripts = join(dirname(fileURLToPath(import.meta.url)), '..', '..',
   'plugins', 'secaudit', 'skills', 'issues', 'scripts')
+// Windows: an absolute path is not a valid ESM specifier, so dynamic import takes a URL.
+const script = name => import(pathToFileURL(join(scripts, name)).href)
 const { computeAnchor, fingerprintFor, legacyFingerprintFor, normalizeCodeLine } =
-  await import(join(scripts, 'fingerprint.mjs'))
+  await script('fingerprint.mjs')
 
 const before = [
   'import os',

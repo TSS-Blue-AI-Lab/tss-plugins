@@ -10,6 +10,8 @@ import { execFileSync } from 'node:child_process'
 import assert from 'node:assert'
 import { publishArtifacts } from '../../plugins/secaudit/skills/secaudit-generate-artifacts/scripts/publish-artifacts.mjs'
 import { enumerateSource, hashSource } from '../../plugins/secaudit/skills/run/scripts/source-corpus.mjs'
+import { computeAnchor, fingerprintFor } from '../../plugins/secaudit/skills/issues/scripts/fingerprint.mjs'
+import { emptyStore, writeStore } from '../../plugins/secaudit/skills/issues/scripts/issue-store.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const root = join(here, '..', '..', 'plugins', 'secaudit')
@@ -356,10 +358,6 @@ assert.match(trace, /sourceFiles|Source files/i, 'trace.md must include coverage
 {
   const fixture = await makeRun()
   // Suppress the first finding by the fingerprint the publisher is about to compute for it.
-  const { computeAnchor, fingerprintFor } =
-    await import(join(root, 'skills/issues/scripts/fingerprint.mjs'))
-  const { emptyStore, writeStore } =
-    await import(join(root, 'skills/issues/scripts/issue-store.mjs'))
   const target = JSON.parse(
     readFileSync(join(fixture.work, 'sast', 'report-data.json'), 'utf8')).findings[0]
   const anchor = computeAnchor({

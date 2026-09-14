@@ -1,12 +1,14 @@
 import { join, dirname } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import assert from 'node:assert'
 
 const scripts = join(dirname(fileURLToPath(import.meta.url)), '..', '..',
   'plugins', 'secaudit', 'skills', 'issues', 'scripts')
-const { emptyStore, ingestRun, applyTransition } = await import(join(scripts, 'issue-store.mjs'))
+// Windows: an absolute path is not a valid ESM specifier, so dynamic import takes a URL.
+const script = name => import(pathToFileURL(join(scripts, name)).href)
+const { emptyStore, ingestRun, applyTransition } = await script('issue-store.mjs')
 const { boardView, archiveView, detailView, runsView, runDetailView } =
-  await import(join(scripts, 'view-model.mjs'))
+  await script('view-model.mjs')
 
 const observation = (over = {}) => ({
   observationId: 'o1', runId: 'r1', class: 'sqli', path: 'a.py', line: 4,

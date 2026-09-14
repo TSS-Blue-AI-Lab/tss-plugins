@@ -2,15 +2,17 @@
 import { mkdtempSync, mkdirSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import assert from 'node:assert'
 
 const scripts = join(dirname(fileURLToPath(import.meta.url)), '..', '..',
   'plugins', 'secaudit', 'skills', 'issues', 'scripts')
+// Windows: an absolute path is not a valid ESM specifier, so dynamic import takes a URL.
+const script = name => import(pathToFileURL(join(scripts, name)).href)
 const { emptyStore, ingestRun, applyTransition, writeStore } =
-  await import(join(scripts, 'issue-store.mjs'))
+  await script('issue-store.mjs')
 const { suppressedIndex, writeKnownIssuesDigest, markSuppressed } =
-  await import(join(scripts, 'known-issues.mjs'))
+  await script('known-issues.mjs')
 
 const SUPPRESSED_FP = 'fp1:' + '1'.repeat(24)
 const LIVE_FP = 'fp1:' + '2'.repeat(24)
@@ -85,7 +87,7 @@ console.log('issues-known-issues: ok')
 // that never happened.
 {
   const { emptyStore: empty, ingestRun: ingest, writeStore: write } =
-    await import(join(scripts, 'issue-store.mjs'))
+    await script('issue-store.mjs')
   const root = mkdtempSync(join(tmpdir(), 'secaudit refuted-'))
   const store = ingest(empty(), {
     runId: 'r1', runDir: '/x/r1', createdUtc: '2026-01-01T00:00:00Z', target: '/p', scope: [],

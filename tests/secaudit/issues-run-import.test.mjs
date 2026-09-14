@@ -2,12 +2,14 @@
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import assert from 'node:assert'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const scripts = join(here, '..', '..', 'plugins', 'secaudit', 'skills', 'issues', 'scripts')
-const { findReportData, importRun } = await import(join(scripts, 'run-import.mjs'))
+// Windows: an absolute path is not a valid ESM specifier, so dynamic import takes a URL.
+const script = name => import(pathToFileURL(join(scripts, name)).href)
+const { findReportData, importRun } = await script('run-import.mjs')
 const fixture = JSON.parse(readFileSync(join(here, 'fixtures', 'report-data.json'), 'utf8'))
 
 function makeRun({ layout, runId, findings = fixture.findings }) {
