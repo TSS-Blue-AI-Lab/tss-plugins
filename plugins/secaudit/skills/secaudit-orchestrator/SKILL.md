@@ -45,8 +45,11 @@ Inspect the target to ground the Hunter recommendation and cost estimate:
 - Run the deterministic inspection (read-only, never writes to the target):
   `node "<PLUGIN_ROOT>/skills/run/scripts/secaudit-runtime.mjs" inspect --target "<target>"` — omit
   `--target` when the user gave no path (the runtime resolves the Git toplevel, else the
-  invocation directory). Parse its one-line JSON `{target, targetSource, artifactRoot,
-  artifactRootSource, coverage, extensions, manifests, warnings, …}`, show the resolved `target`
+  invocation directory). To audit only part of the target, add `--scope <target-relative-path>`
+  (repeatable, or one comma-separated value) — never hand-stage a subset of the repository,
+  because that destroys the project identity the run reports under. Parse its one-line JSON
+  `{target, targetSource, artifactRoot, artifactRootSource, coverage, scope, extensions,
+  manifests, warnings, …}`, show the resolved `target`
   to the user, and surface any `warnings` verbatim.
 - **Say where the report will land**: `<artifactRoot>/.secaudit/runs/`. The run directory follows
   the PROJECT root, not the audited tree — the audited tree's own repository, else the repository
@@ -114,16 +117,11 @@ bound below. The sweep still runs at most once whatever the plan shows.
    - *Phase A (parallel, READ-ONLY)*: fan out `secaudit-trace` subagents over batches of those records (cap = Hunter count, default 5 per subagent, grow the batch not the agent count — see Cost controls). Each traces its records independently and RETURNS verdicts (`REACHABLE` / `UNREACHABLE` / `NEEDS-PROOF` + one-line evidence: entry→sink path, no-path reason, or the exact dynamic test). They must NOT edit any file — parallel writers clobber the single shared `deduped.md`.
    - *Phase B (single writer)*: ONE merge pass adds `**Trace:** <verdict> — <evidence>` under each matching record, keyed strictly by file:line. Nothing else changes.
    - Dead batches: retry once, then abort (Reliability rules).
-7. **Generate Artifacts** — read `<PLUGIN_ROOT>/skills/secaudit-generate-artifacts/SKILL.md` and run its Generate then Publish steps exactly (same schema, templates, and scripts the workflow uses — collect → assemble → render → publish):
+7. **Generate Artifacts** — read `<PLUGIN_ROOT>/skills/secaudit-generate-artifacts/SKILL.md` and run its Generate then Publish steps exactly (same schema and scripts the workflow uses — collect → assemble → publish):
    - *Collect* was already done in Recon / Prepare (`secaudit-runtime.mjs prepare` → `{coverage, corpusSha256, generatedDate}`).
-   - *Assemble* (Generate) — build `$WORK/sast/report-data.json` from `architecture.md`, every `$WORK/sast/*-results.md`, `$WORK/sast/deduped.md`, and the Hunter list/`generatedDate`/`coverage` captured above. `NOT-A-DEFECT` findings come from the per-Hunter results files; `DEFECT`/`UNSURE` records come from `deduped.md`. Validate against `report-data.schema.json` (`validateReportData` from `report-contract.mjs`) before moving on. Never hand-write the visible buckets, counts, Markdown, or HTML yourself.
-   - *Render* (finishes Generate):
-     ```
-     node "<PLUGIN_ROOT>/skills/secaudit-generate-artifacts/scripts/render-report.mjs" \
-       --data "$WORK/sast/report-data.json" \
-       --out-md "$WORK/sast/final-report.md" \
-       --out-html "$WORK/sast/final-report.html"
-     ```
+   - *Assemble* (Generate) — build `$WORK/sast/report-data.json` from `architecture.md`, every `$WORK/sast/*-results.md`, `$WORK/sast/deduped.md`, and the Hunter list/`generatedDate`/`coverage` captured above. `NOT-A-DEFECT` findings come from the per-Hunter results files; `DEFECT`/`UNSURE` records come from `deduped.md`. Validate against `report-data.schema.json` (`validateReportData` from `report-contract.mjs`) before moving on. Never hand-write visible buckets or counts yourself — `report-data.json` is the run's
+     structured record, and the human view is the `secaudit:issues` dashboard, not a rendered
+     report.
    - *Publish* — first write `$WORK/sast/run-ledger.json` (the ledger lines, Hunter list, whether the Blindspot Sweep replayed, and the final Challenge batch count), then:
      ```
      node "<PLUGIN_ROOT>/skills/secaudit-generate-artifacts/scripts/publish-artifacts.mjs" \
@@ -133,7 +131,7 @@ bound below. The sweep still runs at most once whatever the plan shows.
        --run-dir "$RUNDIR" \
        --ledger "$WORK/sast/run-ledger.json"
      ```
-     This re-hashes `<target>` and refuses to copy or prune anything if it is no longer byte-identical to the hash captured in Recon / Prepare — report "corpus not pristine" as a run failure if it aborts. On success it copies `final-report.md`/`final-report.html` into `$RUNDIR` as `report.md`/`report.html`, writes `$RUNDIR/trace.md` (corpus hash, coverage, template version, the ledger contents verbatim), prunes everything under `$WORK` except `$WORK/sast/`, and prints one JSON line `{confirmed, refuted, manualReview}` — that is the run's result.
+     This re-hashes `<target>` and refuses to copy or prune anything if it is no longer byte-identical to the hash captured in Recon / Prepare — report "corpus not pristine" as a run failure if it aborts. On success it writes `$RUNDIR/trace.md` (corpus hash, coverage, template version, the ledger contents verbatim), prunes everything under `$WORK` except `$WORK/sast/`, and prints one JSON line `{confirmed, refuted, manualReview}` — that is the run's result.
    - *Verify* — independently confirm the deliverables exist (an agent can report a success the
      script never achieved):
      ```
@@ -144,4 +142,4 @@ bound below. The sweep still runs at most once whatever the plan shows.
      failed rather than reporting success.
 
 ## After the run
-Report the Confirmed / Refuted / Manual Review counts from the publish summary, the top 3 Confirmed findings, and the paths to `report.md`, `report.html`, and `trace.md`. The run directory is ephemeral — git-ignored whenever it sits inside the audited repo, and holding a full copy of that repo including its `.env` — so tell the user to copy out anything worth keeping and delete it when done. Never claim the codebase is "secure."
+Report the Confirmed / Refuted / Manual Review counts from the publish summary, the top 3 Confirmed findings, and the paths to `$RUNDIR/trace.md` and `$WORK/sast/report-data.json`. Read the findings in the `secaudit:issues` dashboard — no report is rendered. The copied source is removed automatically on a successful publish; `$WORK/sast/` keeps the stage evidence. If publish reports state `cleanup-incomplete`, say so plainly and name the entries it listed as remaining — that run still holds a copy of the audited tree, including its `.env`, and needs deleting by hand. Never claim the codebase is "secure."

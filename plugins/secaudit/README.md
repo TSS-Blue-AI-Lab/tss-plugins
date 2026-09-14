@@ -90,11 +90,13 @@ One run writes exactly one directory:
 
 ```
 <project-root>/.secaudit/runs/<run-id>/
-├── report.md          # findings, buckets, counts
-├── report.html         # the same report, rendered
 ├── trace.md            # corpus hash, coverage, template version, stage ledger
-└── work/sast/          # retained evidence: per-Hunter results, deduped set, report data
+└── work/sast/          # per-Hunter results, deduped set, and report-data.json — the
+                        # structured findings the secaudit:issues dashboard reads
 ```
+
+No report is rendered. `report-data.json` is the run's record of what it found, and the
+`secaudit:issues` dashboard is the human view of it.
 
 The project root is the audited tree's own Git toplevel; if the audited tree is in no
 repository — a staged or copied workspace, say — it is the Git toplevel above your current
@@ -108,13 +110,53 @@ makes a clean repository look dirty. That matters beyond tidiness: the work tree
 verbatim copy of the target including dotfiles, so an unignored run directory puts real
 `.env` secrets one `git add -A` from a commit.
 
-Run directories are **ephemeral by design**: they are git-ignored, and deleting the checkout
-deletes the audit history with it. Copy out anything worth keeping. Deleting
-`<project-root>/.secaudit/runs/<run-id>/` is safe at any time — that is how you reclaim disk.
+The copied source is removed on a successful publish, leaving `work/sast/` — the stage
+evidence and `report-data.json`. A run that reports `cleanup-incomplete` still holds that copy
+and names what remains; delete those entries by hand. Deleting
+`<project-root>/.secaudit/runs/<run-id>/` is safe at any time — that is how you reclaim disk,
+though the dashboard then loses that run's history.
+
+Audit part of a repository with `--scope <target-relative-path>` (repeatable, or one
+comma-separated value) rather than staging a copy of the subset: scope restricts what is read
+while the target, project root, and corpus hash keep referring to the real repository.
 
 `--output` overrides the exact run directory, not just its parent. Paths that would make the
 isolated copy contain itself, that contain the target, or that point at a non-empty directory
 secaudit does not own are rejected before anything is copied.
+
+## The Workbench
+
+`/secaudit:issues [project-path]` opens the triage board. It first syncs the persistent issue
+store with every run it can discover in the project, then serves the board locally:
+
+```
+node "<plugin>/skills/issues/scripts/server.mjs" --project "<project>"
+{"url":"http://127.0.0.1:53129"}
+```
+
+The server binds to `127.0.0.1` only, serves one project, and stops with Ctrl-C. The board
+itself is a static page — no build step, no CDN, no network at runtime; IBM Plex ships with it.
+
+Decisions live in `<project-root>/.secaudit/issues.json` and are the only thing that moves a
+card between the three board columns. Findings the audit refuted — Challenge said
+`NOT-A-DEFECT`, or Trace said `UNREACHABLE` — never reach the inbox at all: they open in the
+archive marked as the audit's own verdict, and return to the inbox by themselves if a later run
+stops refuting them. Only a human dismissal is permanent.
+
+Findings are matched across runs by a code anchor rather than by title or line number, so the
+same defect stays one card as the file changes around it. A finding marked a false positive
+is archived and suppressed at publication time in every later run until someone restores it; a
+finding that simply stops appearing is never marked done, because scope and coverage differ
+between runs. Nothing done on the board changes a historical run's report.
+
+Upgrading secaudit never asks you to re-run an audit or delete your board. The store carries a
+version, and a newer plugin migrates an older store in memory as it reads it, writing the new
+shape back the next time you actually change something. Migrations never overrule a decision a
+person made, and never invent a verdict for a finding whose evidence was not retained. Old run
+directories import as they always did: pre-anchor findings get a `legacy1:` identity and are
+flagged for an explicit merge decision rather than being guessed into an existing issue.
+Downgrading is the one direction that does not work — an older plugin refuses a store newer
+than it understands, rather than silently discarding the fields it does not know about.
 
 ## Limitations
 

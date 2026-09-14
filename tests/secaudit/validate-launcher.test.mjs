@@ -75,4 +75,16 @@ assert.ok(
 assert.match(cmd, /pluginRoot:\s*"<PLUGIN_ROOT>"/, 'launcher passes pluginRoot into the workflow')
 assert.match(cmd, /name:\s*"secaudit:secaudit"/, 'launcher calls the namespaced plugin workflow')
 
+// The launcher must show the three things an operator cannot recover afterwards, and must
+// never restore a previous run's scope silently.
+for (const needle of [
+  '--scope',
+  'Selected scope',
+  'never reuse a previous run\'s scope',
+]) {
+  assert.ok(cmd.includes(needle), 'run/SKILL.md must mention: ' + needle)
+}
+assert.ok(!/stage(d)? a copy|copy the repo/i.test(cmd),
+  'run/SKILL.md must not advise hand-staging a copy; --scope replaces it')
+
 console.log('PASS validate-launcher checks')

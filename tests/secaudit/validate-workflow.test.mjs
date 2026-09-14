@@ -39,12 +39,14 @@ for (const retired of ['Setup', 'Validate', 'Gapfill', 'Feedback', 'Report', 'Ha
 for (const required of [
   'secaudit-generate-artifacts',
   'report-data.json',
-  'render-report.mjs',
   'publish-artifacts.mjs',
   'traceBatch',
   'blindspotSweep',
   'hunters',
 ]) assert.match(src, new RegExp(required), `workflow must reference '${required}'`)
+// The rendered report is retired: the dashboard is the human view. Asserted gone so a
+// reintroduced render stage fails the suite rather than quietly coming back.
+assert.ok(!/render-report|artifacts:render/.test(src), 'workflow must not run a report renderer')
 
 // 5. Fan-out present: parallel() used at least twice (Hunt + Challenge).
 assert.ok((src.match(/parallel\(/g) || []).length >= 2, 'parallel() fan-out for Hunt and Challenge')
@@ -158,6 +160,10 @@ assert.ok(
 assert.match(src, /const SKILLS = pluginRoot \+ '\/skills'/, 'SKILLS derives from pluginRoot')
 // The launcher targets the namespaced plugin workflow, so meta.name must stay 'secaudit'.
 assert.match(src, /name: 'secaudit',/, "meta.name is 'secaudit' (installs as /secaudit:secaudit)")
+
+// The workflow must pass the run context through verbatim rather than re-deriving paths.
+assert.ok(src.includes('scope'), 'workflow must thread scope through')
+assert.ok(!/process\.cwd\(\)/.test(src), 'workflow must never re-derive paths from cwd')
 
 console.log('PASS validate-workflow structural checks')
 
@@ -367,10 +373,10 @@ for (const bad of [undefined, null, '', '   ', 'nope', 'secaudit', 42, true, {}]
 // Same dead-block problem as B9: the old assertion matched the message inside the `if`.
 {
   const err = await runWorkflow({
-    reply: ({ label }) => (label === 'artifacts:verify' ? { missing: ['report.html', 'trace.md'] } : undefined),
+    reply: ({ label }) => (label === 'artifacts:verify' ? { missing: ['trace.md', 'work/sast/report-data.json'] } : undefined),
   }).then(() => null, e => e)
   assert.ok(err, 'a run whose deliverables are missing must not report success')
-  assert.match(err.message, /report\.html, trace\.md/, err.message)
+  assert.match(err.message, /trace\.md, work\/sast\/report-data\.json/, err.message)
   // And the happy path still completes, so the assertion above is not just "always throws".
   const { result } = await runWorkflow()
   assert.ok(result.runDir, 'a run with all deliverables present completes')

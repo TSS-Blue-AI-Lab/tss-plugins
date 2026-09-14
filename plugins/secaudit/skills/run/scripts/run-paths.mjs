@@ -5,12 +5,35 @@ import { existsSync } from 'node:fs'
 import { join, resolve, dirname, basename, sep } from 'node:path'
 
 export const MARKER_NAME = 'secaudit-run.json'
-export const MARKER_FORMAT_VERSION = 1
+export const MARKER_FORMAT_VERSION = 2
+// v1 markers are historical runs. They are read, never rewritten: a past run's record of
+// what it did is evidence, and migrating it in place would fabricate lifecycle facts.
+export const SUPPORTED_MARKER_VERSIONS = new Set([1, 2])
+
+export const RUN_STATES = ['preparing', 'prepared', 'published', 'complete', 'cleanup-incomplete']
 
 export class RuntimeError extends Error {
   constructor(code, message) {
     super(message)
     this.code = code
+  }
+}
+
+// Forward-only. `complete` requires publication AND successful cleanup, so nothing reaches it
+// from `prepared`: a run that never published has no source copy worth calling cleaned up.
+const ALLOWED_TRANSITIONS = new Map([
+  ['preparing', new Set(['prepared', 'cleanup-incomplete'])],
+  ['prepared', new Set(['published', 'cleanup-incomplete'])],
+  ['published', new Set(['complete', 'cleanup-incomplete'])],
+  ['complete', new Set([])],
+  ['cleanup-incomplete', new Set(['complete'])],
+])
+
+export function assertTransition(from, to) {
+  if (!RUN_STATES.includes(to)) throw new RuntimeError('E_RUN_STATE', 'unknown run state: ' + to)
+  if (from === to) return
+  if (!ALLOWED_TRANSITIONS.get(from)?.has(to)) {
+    throw new RuntimeError('E_RUN_STATE', 'illegal run state transition: ' + from + ' -> ' + to)
   }
 }
 
@@ -69,7 +92,7 @@ export async function readMarker(dir) {
   if (raw == null) return null
   try {
     const parsed = JSON.parse(raw)
-    if (parsed.marker === 'secaudit-run' && parsed.formatVersion === MARKER_FORMAT_VERSION) {
+    if (parsed.marker === 'secaudit-run' && SUPPORTED_MARKER_VERSIONS.has(parsed.formatVersion)) {
       return parsed
     }
   } catch { /* not a marker */ }
@@ -80,6 +103,19 @@ export async function writeMarker(dir, fields) {
   const marker = { marker: 'secaudit-run', formatVersion: MARKER_FORMAT_VERSION, ...fields }
   await writeFile(join(dir, MARKER_NAME), JSON.stringify(marker, null, 2) + '\n', 'utf8')
   return marker
+}
+
+// Merge-and-advance. Callers past `prepare` own only their own fields; everything the run
+// already recorded is carried forward so a later stage cannot erase preparation facts.
+export async function updateMarker(dir, fields) {
+  const current = await readMarker(dir)
+  if (!current) {
+    throw new RuntimeError('E_RUN_MARKER_MISSING',
+      'not a secaudit run directory (missing or invalid ' + MARKER_NAME + '): ' + dir)
+  }
+  if (fields.state) assertTransition(current.state, fields.state)
+  const { marker, formatVersion, ...rest } = current
+  return writeMarker(dir, { ...rest, ...fields })
 }
 
 // Where a default run directory belongs: the PROJECT root, not the corpus root. Auditing a

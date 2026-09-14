@@ -73,7 +73,21 @@
         "severity": { "type": ["string", "null"], "enum": ["Critical", "High", "Medium", "Low", null] },
         "impact": { "type": ["string", "null"] },
         "remediation": { "type": ["string", "null"] },
-        "dynamicTest": { "type": ["string", "null"] }
+        "dynamicTest": { "type": ["string", "null"] },
+        "suppressed": { "type": "boolean" },
+        "suppressedIssueId": { "type": ["string", "null"] },
+        "anchor": {
+          "type": ["object", "null"],
+          "required": ["version", "anchorKind", "anchorName", "codeHash", "fingerprint"],
+          "additionalProperties": false,
+          "properties": {
+            "version": { "const": 1 },
+            "anchorKind": { "enum": ["decl", "file"] },
+            "anchorName": { "type": "string", "minLength": 1 },
+            "codeHash": { "type": "string", "pattern": "^[0-9a-f]{16}$" },
+            "fingerprint": { "type": "string", "pattern": "^fp1:[0-9a-f]{24}$" }
+          }
+        }
       }
     }
   }

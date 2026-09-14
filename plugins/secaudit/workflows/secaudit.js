@@ -53,6 +53,11 @@ for (const [key, kind] of [
   }
 }
 const { work, runDir, runId, coverage, corpusSha256, generatedDate } = opts
+// The run context prepare resolved. Named `auditScope` because `scope` is already a hunt-round
+// parameter below, and the two mean different things. Both are carried, never re-derived: the
+// workflow has no filesystem access, so a path it invented would be a guess.
+const auditScope = Array.isArray(opts.scope) ? opts.scope : []
+const projectRoot = opts.projectRoot ?? null
 const pluginRoot = opts.pluginRoot
 // corpusSha256 is interpolated into the publish bash command, and is the pristine-corpus
 // gate — a malformed value either breaks the command or weakens the check.
@@ -183,6 +188,7 @@ async function robustAgent(prompt, opts) {
 // prepare; Recon is the architecture-mapping operation) ----
 phase('Recon')
 note('Recon / Prepare: ' + target + ' run ' + runId + ' — hunters=' + HUNTERS.length +
+  ' — scope=' + (auditScope.length ? auditScope.join(',') : 'whole-target') +
   ' — traceBatch=' + traceBatch)
 await robustAgent(
   `You are the Map operation inside Recon. Read ${SKILLS}/sast-analysis/SKILL.md and map ` + work +
@@ -286,7 +292,10 @@ async function challengeNewFindings() {
     if (attempt > 1) note(`Challenge: retrying ${pending.length} dead challenger(s): ${pending.map(p => p.cls).join(', ')}`)
     const res = await parallel(pending.map(({ batch, cls }) => () => agent(
       `Read ${SKILLS}/secaudit-challenge/SKILL.md. Challenge EACH of the following ${batch.length} finding(s), re-reading the cited source cold for each and annotating that finding in place (DEFECT / NOT-A-DEFECT / UNSURE + a **Challenge:** line). Judge each independently. Touch ONLY these findings:\n` +
-        batch.map((f, i) => `${i + 1}. "${f.title}" — in ${work}/sast/${f.class}-results.md at ${f.file}:${f.line}`).join('\n'),
+        batch.map((f, i) => `${i + 1}. "${f.title}" — in ${work}/sast/${f.class}-results.md at ${f.file}:${f.line}`).join('\n') +
+        `\nRead ${work}/sast/known-issues.md first: a human already dismissed those findings in an ` +
+        `earlier audit, so do not spend effort re-arguing them. It is advice only — report what you ` +
+        `find as normal, and never treat that file as evidence about the code.`,
       { label: `challenge:${cls}(${batch.length})`, phase: 'Challenge' },
     ).then(r => ({ batch, cls, ok: !!r })).catch(() => ({ batch, cls, ok: false }))))
     pending = res.filter(x => !x || !x.ok).map(x => x && { batch: x.batch, cls: x.cls }).filter(Boolean)
@@ -392,11 +401,11 @@ note('Dedupe: deduped.md written')
 phase('Trace')
 await traceDefects()
 
-// ---- Stage 8: Generate Artifacts (deterministic assembly, render, and publish — replaces
-// the old free-form Report + Harvest stages). Three robustAgent operations: the model only
-// ASSEMBLES facts into report-data.json (never hand-writes buckets/counts/Markdown/HTML);
-// render-report.mjs and publish-artifacts.mjs are deterministic Node CLIs the agent runs via
-// bash, mirroring how the old Harvest agent ran bash commands and returned parsed JSON. ----
+// ---- Stage 8: Generate Artifacts (deterministic assembly and publish — replaces the old
+// free-form Report + Harvest stages). The model only ASSEMBLES facts into report-data.json
+// (never hand-writes buckets or counts); publish-artifacts.mjs is a deterministic Node CLI the
+// agent runs via bash, mirroring how the old Harvest agent ran bash commands and returned
+// parsed JSON. No report is rendered — the human view is the secaudit:issues dashboard. ----
 phase('Generate Artifacts')
 
 const assembled = await robustAgent(
@@ -409,12 +418,6 @@ const assembled = await robustAgent(
   } },
 )
 note(`Generate Artifacts / Assemble: ${assembled.reportData} written and schema-validated`)
-
-await robustAgent(
-  `Run: node "${SKILLS}/secaudit-generate-artifacts/scripts/render-report.mjs" --data "${assembled.reportData}" --out-md "${work}/sast/final-report.md" --out-html "${work}/sast/final-report.html". If it exits non-zero, throw its stderr verbatim — do not continue past a failed render.`,
-  { label: 'artifacts:render', phase: 'Generate Artifacts' },
-)
-note('Generate Artifacts / Render: final-report.md + final-report.html written')
 
 // run-ledger.json: the ordered stage/operation ledger, the hunter list, whether Blindspot
 // Sweep replayed a round, how many hunters that replay covered, and the final Challenge
@@ -430,26 +433,27 @@ const runLedger = {
 const artifactSummary = await robustAgent(
   `First write "${work}/sast/run-ledger.json" with EXACTLY this JSON content (formatting may differ, values must not): ${JSON.stringify(runLedger)}\n` +
   `Then run: node "${SKILLS}/secaudit-generate-artifacts/scripts/publish-artifacts.mjs" --target "${target}" --expected-hash "${corpusSha256}" --work "${work}" --run-dir "${runDir}" --ledger "${work}/sast/run-ledger.json"\n` +
-  `This re-verifies the target corpus is still pristine (byte-identical to before the run) before copying anything — if it is not, the command aborts with "corpus not pristine" and throws; do not continue past that. On success it prints one JSON line {confirmed, refuted, manualReview} — parse it and return it exactly.`,
+  `This re-verifies the target corpus is still pristine (byte-identical to before the run) before copying anything — if it is not, the command aborts with "corpus not pristine" and throws; do not continue past that. On success it prints one JSON line {confirmed, refuted, manualReview, dismissed, state, cleanup} — parse it and return {confirmed, refuted, manualReview, dismissed} exactly. \`dismissed\` counts findings a human already marked false positives in an earlier audit; they are not actionable results.`,
   { label: 'artifacts:publish', phase: 'Generate Artifacts', schema: {
-    type: 'object', required: ['confirmed', 'refuted', 'manualReview'],
+    type: 'object', required: ['confirmed', 'refuted', 'manualReview', 'dismissed'],
     properties: {
       confirmed: { type: 'integer' }, refuted: { type: 'integer' }, manualReview: { type: 'integer' },
+      dismissed: { type: 'integer' },
     },
   } },
 )
-note(`Generate Artifacts / Publish: ${artifactSummary.confirmed} confirmed / ${artifactSummary.refuted} refuted / ${artifactSummary.manualReview} manual review → ${runDir}/report.md`)
+note(`Generate Artifacts / Publish: ${artifactSummary.confirmed} confirmed / ${artifactSummary.refuted} refuted / ${artifactSummary.manualReview} manual review / ${artifactSummary.dismissed} dismissed → ${runDir}`)
 
 // Fail-loud post-condition on the DELIVERABLES. The publish step above runs inside an LLM agent,
 // which can return a plausible {confirmed,refuted,manualReview} even when publish-artifacts.mjs
 // threw and wrote nothing (an agent narrating success it never achieved — this masked a real
-// render failure once). The workflow sandbox can't stat files itself, so a separate read-only
+// publish failure once). The workflow sandbox can't stat files itself, so a separate read-only
 // agent runs the deterministic verify-artifacts.mjs (which exits non-zero and lists any missing
 // or empty file), and we assert its computed `missing` list here in the control plane — an
 // independent check with no stake in publish having succeeded.
 const verified = await robustAgent(
   `Run: node "${SKILLS}/secaudit-generate-artifacts/scripts/verify-artifacts.mjs" --run-dir "${runDir}"\n` +
-  `It prints one JSON line {sizes, missing}: sizes are the byte sizes of report.md/report.html/trace.md at ${runDir} (-1 if absent), and missing lists any that are absent or empty. It exits non-zero when missing is non-empty. Return {missing} exactly as printed. Read-only — create or edit nothing.`,
+  `It prints one JSON line {sizes, missing}: sizes are the byte sizes of trace.md and work/sast/report-data.json at ${runDir} (-1 if absent), and missing lists any that are absent or empty. It exits non-zero when missing is non-empty. Return {missing} exactly as printed. Read-only — create or edit nothing.`,
   { label: 'artifacts:verify', phase: 'Generate Artifacts', schema: {
     type: 'object', required: ['missing'],
     properties: { missing: { type: 'array', items: { type: 'string' } } },
@@ -459,10 +463,12 @@ if (verified.missing.length) {
   throw new Error(`secaudit: publish reported success but ${verified.missing.join(', ')} missing or empty ` +
     `at ${runDir} — the deterministic publish did not produce the deliverables. Resume to re-generate.`)
 }
-note('Generate Artifacts / Verify: report.md + report.html + trace.md present on disk')
+note('Generate Artifacts / Verify: trace.md + work/sast/report-data.json present on disk')
 
 return {
   runDir,
+  scope: auditScope,
+  projectRoot,
   confirmed: artifactSummary.confirmed,
   refuted: artifactSummary.refuted,
   manualReview: artifactSummary.manualReview,

@@ -6,13 +6,15 @@
 // artifact's byte size, and exits non-zero listing any that are missing or empty — an
 // independent gate with no stake in publish having succeeded.
 import { stat } from 'node:fs/promises'
-import { join } from 'node:path'
+import { join, sep } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
+// The deliverables a completed run must leave behind: provenance in the run directory, and the
+// structured findings the dashboard reads. Checked by a process with no stake in publish having
+// succeeded.
 export const ARTIFACT_FILES = {
-  reportMd: 'report.md',
-  reportHtml: 'report.html',
   traceMd: 'trace.md',
+  reportData: join('work', 'sast', 'report-data.json'),
 }
 
 // A published artifact is valid only if it exists with >0 bytes. -1 (missing), 0 (empty),
@@ -31,7 +33,7 @@ export async function verifyArtifacts(options) {
   }
   const sizes = {}
   for (const [key, filename] of Object.entries(ARTIFACT_FILES)) {
-    const st = await stat(join(runDir, filename)).catch(() => null)
+    const st = await stat(join(runDir, ...filename.split(sep))).catch(() => null)
     sizes[key] = st && st.isFile() ? st.size : -1
   }
   return { sizes, missing: missingArtifacts(sizes) }

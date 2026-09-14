@@ -16,7 +16,8 @@ export const SOURCE_EXTENSIONS = new Set([
 // Mirrors run-paths.mjs' readMarker envelope check (marker + formatVersion),
 // inlined so this stays a leaf module with no dependency on run-paths.mjs.
 const RUN_MARKER_NAME = 'secaudit-run.json'
-const RUN_MARKER_FORMAT_VERSION = 1
+// Mirrors run-paths.mjs' SUPPORTED_MARKER_VERSIONS, inlined so this stays a leaf module.
+const RUN_MARKER_FORMAT_VERSIONS = new Set([1, 2])
 
 async function isRunMarkerDir(dirAbs, entries) {
   if (!entries.some(e => e.isFile() && e.name === RUN_MARKER_NAME)) return false
@@ -24,7 +25,7 @@ async function isRunMarkerDir(dirAbs, entries) {
   if (raw == null) return false
   try {
     const parsed = JSON.parse(raw)
-    return parsed.marker === 'secaudit-run' && parsed.formatVersion === RUN_MARKER_FORMAT_VERSION
+    return parsed.marker === 'secaudit-run' && RUN_MARKER_FORMAT_VERSIONS.has(parsed.formatVersion)
   } catch {
     return false
   }
@@ -41,8 +42,42 @@ function countLines(buffer) {
   return buffer[buffer.length - 1] === 0x0a ? newlines : newlines + 1
 }
 
+// Scope entries are POSIX-relative paths under the target. They restrict WHAT IS READ; they
+// never move the root, so the project identity, artifact root, and corpus hash keep pointing
+// at the real repository — which is exactly what hand-staging a copy used to destroy.
+function normalizeScope(root, scope) {
+  const normalized = []
+  for (const raw of scope) {
+    const rel = raw.split(sep).join('/').replace(/^\.\/+/, '').replace(/\/+$/, '')
+    if (rel === '' || rel === '.') return [] // an explicit whole-tree scope
+    const abs = join(root, ...rel.split('/'))
+    if (abs !== root && !abs.startsWith(root + sep)) {
+      throw new Error('scope entry escapes the target: ' + raw)
+    }
+    normalized.push(rel)
+  }
+  return [...new Set(normalized)].sort()
+}
+
+function inScope(rel, scope) {
+  if (scope.length === 0) return true
+  return scope.some(s => rel === s || rel.startsWith(s + '/'))
+}
+
+// True when a directory could still contain in-scope files, so recursion is not pruned early.
+function scopeTouchesDir(rel, scope) {
+  if (scope.length === 0) return true
+  return scope.some(s => rel === '' || s === rel || s.startsWith(rel + '/') || rel.startsWith(s + '/'))
+}
+
+function matchedScopeEntry(rel, scope) {
+  return scope.find(s => rel === s || rel.startsWith(s + '/'))
+}
+
 // root must already be canonical (realpath'd by the caller).
-export async function enumerateSource(root, { extraExcluded = [] } = {}) {
+export async function enumerateSource(root, { extraExcluded = [], scope = [] } = {}) {
+  const normalizedScope = normalizeScope(root, scope)
+  const seenScope = new Set()
   const prefixes = extraExcluded.map(p => (p.endsWith(sep) ? p : p + sep))
   const files = []
   const internalSymlinks = []
@@ -64,6 +99,7 @@ export async function enumerateSource(root, { extraExcluded = [] } = {}) {
       const abs = join(dirAbs, entry.name)
       const rel = toPosix(relative(root, abs))
       if (entry.isSymbolicLink()) {
+        if (!inScope(rel, normalizedScope)) continue
         const dest = await realpath(abs).catch(() => null)
         if (dest && (dest === root || dest.startsWith(root + sep))) internalSymlinks.push(rel)
         else externalSymlinks.push(rel)
@@ -75,8 +111,12 @@ export async function enumerateSource(root, { extraExcluded = [] } = {}) {
           continue
         }
         if (prefixes.some(p => (abs + sep).startsWith(p))) continue
+        if (!scopeTouchesDir(rel, normalizedScope)) continue
+        if (inScope(rel, normalizedScope)) seenScope.add(matchedScopeEntry(rel, normalizedScope))
         await recurse(abs, false)
       } else if (entry.isFile()) {
+        if (!inScope(rel, normalizedScope)) continue
+        seenScope.add(matchedScopeEntry(rel, normalizedScope))
         files.push(rel)
       }
     }
@@ -88,6 +128,8 @@ export async function enumerateSource(root, { extraExcluded = [] } = {}) {
     externalSymlinks: [...externalSymlinks].sort(),
     excludedDirsHit: [...excludedDirsHit].sort(),
     excludedRunDirs: [...excludedRunDirs].sort(),
+    scope: normalizedScope,
+    scopeMisses: normalizedScope.filter(s => !seenScope.has(s)),
   }
 }
 

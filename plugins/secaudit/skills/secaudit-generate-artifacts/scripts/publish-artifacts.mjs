@@ -1,14 +1,18 @@
 #!/usr/bin/env node
-// secaudit-generate-artifacts publisher: copies the final report into the run
-// directory and prunes the scratch work tree, but ONLY after re-verifying the
+// secaudit-generate-artifacts publisher: writes the run's provenance trace into the
+// run directory and prunes the scratch work tree, but ONLY after re-verifying the
 // source corpus hasn't changed since the audit ran. This is the security-critical
 // gate: a non-pristine corpus must never cause a partial publish or a prune.
+// The human view is the Workbench dashboard, which reads work/sast/report-data.json; no
+// rendered report is produced.
 import { readdir, readFile, writeFile, rename, rm, stat, realpath } from 'node:fs/promises'
 import { join, sep, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { validateReportData, summaryFor } from './report-contract.mjs'
 import { enumerateSource, hashSource } from '../../run/scripts/source-corpus.mjs'
-import { readMarker, MARKER_NAME } from '../../run/scripts/run-paths.mjs'
+import { readMarker, updateMarker, MARKER_NAME } from '../../run/scripts/run-paths.mjs'
+import { computeAnchor, fingerprintFor } from '../../issues/scripts/fingerprint.mjs'
+import { suppressedIndex, markSuppressed } from '../../issues/scripts/known-issues.mjs'
 
 function requireNonEmptyString(value, label) {
   if (typeof value !== 'string' || value.length === 0) {
@@ -58,12 +62,44 @@ async function atomicWrite(path, content) {
   await rename(tmpPath, path)
 }
 
+// The copied source is temporary: it is removed on success and only the audit evidence stays.
+// Returning the accounting (rather than nothing) is what lets the run refuse to claim success
+// when a leftover survives — an operator who is told "clean" must actually be clean.
 async function pruneWorkExceptSast(work) {
-  const entries = await readdir(work, { withFileTypes: true })
-  for (const entry of entries) {
+  const removed = []
+  for (const entry of await readdir(work, { withFileTypes: true })) {
     if (entry.name === 'sast') continue
     await rm(join(work, entry.name), { recursive: true, force: true })
+    removed.push(entry.name)
   }
+  const remaining = (await readdir(work)).sort()
+  return { removed: removed.sort(), remaining, ok: remaining.every(name => name === 'sast') }
+}
+
+// Anchors are computed HERE, and only here, because this is the last moment the copied source
+// exists: the next statement prunes it, and the target itself may change the minute we finish.
+// A finding whose file is missing from the copy (scoped out, or a path the model invented) is
+// left without an anchor rather than anchored to a guess — import treats it as legacy identity.
+export async function annotateAnchors(reportData, work) {
+  const findings = []
+  for (const finding of reportData.findings) {
+    const sourceText = await readFile(join(work, ...finding.path.split('/')), 'utf8')
+      .catch(() => null)
+    if (sourceText == null) {
+      findings.push({ ...finding, anchor: null })
+      continue
+    }
+    const anchor = computeAnchor({ sourceText, line: finding.line, path: finding.path })
+    findings.push({
+      ...finding,
+      anchor: {
+        version: 1,
+        ...anchor,
+        fingerprint: fingerprintFor({ class: finding.class, path: finding.path, ...anchor }),
+      },
+    })
+  }
+  return { ...reportData, findings }
 }
 
 export async function publishArtifacts(options) {
@@ -90,11 +126,7 @@ export async function publishArtifacts(options) {
 
   const sastDir = join(work, 'sast')
   await requireDirectory(sastDir, 'work/sast')
-  const finalMdPath = join(sastDir, 'final-report.md')
-  const finalHtmlPath = join(sastDir, 'final-report.html')
   const reportDataPath = join(sastDir, 'report-data.json')
-  await requireFile(finalMdPath, 'work/sast/final-report.md')
-  await requireFile(finalHtmlPath, 'work/sast/final-report.html')
   await requireFile(reportDataPath, 'work/sast/report-data.json')
   await requireFile(ledgerPath, 'ledgerPath')
 
@@ -141,9 +173,6 @@ export async function publishArtifacts(options) {
 
   // --- 3. Pristine: copy artifacts via .tmp siblings, rename only after each
   //        write succeeds, THEN prune the work tree. ---
-  const summary = summaryFor(reportData.findings)
-  const finalMd = await readFile(finalMdPath, 'utf8')
-  const finalHtml = await readFile(finalHtmlPath, 'utf8')
   // The run directory follows the project root, so it is not necessarily inside what was
   // audited: the trace has to name the tree the hash was taken over.
   const traceMd = buildTraceMd({
@@ -151,13 +180,28 @@ export async function publishArtifacts(options) {
     target: canonicalTarget,
   })
 
-  await atomicWrite(join(runDir, 'report.md'), finalMd)
-  await atomicWrite(join(runDir, 'report.html'), finalHtml)
   await atomicWrite(join(runDir, 'trace.md'), traceMd)
 
-  await pruneWorkExceptSast(work)
+  // Anchors first, then dismissal: a finding cannot be matched against the archive until it
+  // has an identity. Both happen before the prune, while the source copy still exists.
+  const anchored = await annotateAnchors(reportData, work)
+  const projectRoot = marker.projectRoot ?? marker.artifactRoot ?? runDir
+  const dismissed = markSuppressed(anchored, await suppressedIndex(projectRoot))
+  validateReportData(dismissed)
+  await atomicWrite(reportDataPath, JSON.stringify(dismissed, null, 2) + '\n')
 
-  return summary
+  const publishedUtc = new Date().toISOString()
+  await updateMarker(runDir, {
+    state: 'published',
+    publishedUtc,
+    artifacts: ['trace.md'],
+  })
+
+  const cleanup = await pruneWorkExceptSast(work)
+  const state = cleanup.ok ? 'complete' : 'cleanup-incomplete'
+  await updateMarker(runDir, { state, cleanup })
+
+  return { ...summaryFor(dismissed.findings), state, cleanup }
 }
 
 function parseArgs(argv) {
@@ -180,7 +224,15 @@ function parseArgs(argv) {
 const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href
 if (isMain) {
   publishArtifacts(parseArgs(process.argv.slice(2)))
-    .then(summary => console.log(JSON.stringify(summary)))
+    .then(result => {
+      console.log(JSON.stringify(result))
+      if (!result.cleanup.ok) {
+        console.error('publish-artifacts: the copied source was NOT fully removed; these entries '
+          + 'remain under the work tree: ' + result.cleanup.remaining.join(', ')
+          + ' — the run is recorded as cleanup-incomplete, delete them by hand')
+        process.exitCode = 1
+      }
+    })
     .catch(err => {
       console.error(err.message)
       process.exitCode = 1

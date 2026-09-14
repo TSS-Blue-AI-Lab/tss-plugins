@@ -43,7 +43,12 @@ assert.ok(
 // authorize either client to start one on its own initiative.
 const GATED = ['run', 'secaudit-orchestrator']
 
-for (const name of GATED) {
+// `issues` is gated for a different reason: it costs nothing, but it starts a long-lived local
+// server that serves the project's findings. Starting and stopping a server is the operator's
+// call, so it takes the same explicit gate in both clients.
+const SERVERS = ['issues']
+
+for (const name of [...GATED, ...SERVERS]) {
   const skill = readFileSync(join(root, 'skills', name, 'SKILL.md'), 'utf8')
   const frontmatter = skill.split(/^---$/m)[1] ?? ''
   assert.match(
@@ -70,7 +75,7 @@ const skillDirs = readdirSync(join(root, 'skills'), { withFileTypes: true })
   .filter(e => e.isDirectory())
   .map(e => e.name)
 for (const name of skillDirs) {
-  if (GATED.includes(name)) continue
+  if (GATED.includes(name) || SERVERS.includes(name)) continue
   assert.ok(
     !existsSync(join(root, 'skills', name, 'agents', 'openai.yaml')),
     `${name}: must NOT be gated — only the two full-pipeline entry points are explicit-only`,

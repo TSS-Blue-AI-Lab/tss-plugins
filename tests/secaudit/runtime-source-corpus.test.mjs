@@ -144,3 +144,37 @@ if (symlinksSupported) {
 }
 
 console.log('PASS runtime-source-corpus')
+
+// --- scope selection -------------------------------------------------------
+{
+  const root = realpathSync.native(mkdtempSync(join(tmpdir(), 'secaudit scope-')))
+  mkdirSync(join(root, 'api', 'deep'), { recursive: true })
+  mkdirSync(join(root, 'web'), { recursive: true })
+  writeFileSync(join(root, 'api', 'a.py'), 'a = 1\n', 'utf8')
+  writeFileSync(join(root, 'api', 'deep', 'b.py'), 'b = 1\n', 'utf8')
+  writeFileSync(join(root, 'web', 'c.js'), 'c\n', 'utf8')
+  writeFileSync(join(root, 'root.py'), 'r = 1\n', 'utf8')
+
+  const all = await enumerateSource(root)
+  assert.deepEqual(all.files, ['api/a.py', 'api/deep/b.py', 'root.py', 'web/c.js'])
+  assert.deepEqual(all.scope, [])
+
+  const scoped = await enumerateSource(root, { scope: ['api'] })
+  assert.deepEqual(scoped.files, ['api/a.py', 'api/deep/b.py'])
+  assert.deepEqual(scoped.scope, ['api'])
+  assert.deepEqual(scoped.scopeMisses, [])
+
+  // A single file is a valid scope entry.
+  const oneFile = await enumerateSource(root, { scope: ['root.py'] })
+  assert.deepEqual(oneFile.files, ['root.py'])
+
+  // Nonexistent scope entries are reported, not silently ignored.
+  const missing = await enumerateSource(root, { scope: ['api', 'nope'] })
+  assert.deepEqual(missing.scopeMisses, ['nope'])
+
+  // Scope never escapes the root.
+  await assert.rejects(enumerateSource(root, { scope: ['../elsewhere'] }),
+    err => /scope entry escapes the target/.test(err.message))
+
+  console.log('source-corpus scope: ok')
+}

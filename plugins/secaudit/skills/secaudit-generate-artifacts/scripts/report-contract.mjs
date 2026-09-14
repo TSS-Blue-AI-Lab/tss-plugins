@@ -76,6 +76,26 @@ function validateFinding(finding, seenIds) {
   seenIds.add(finding.id)
   requireValue(finding.id === findingId(finding), 'finding.id does not match findingId(finding): ' + finding.id)
 
+  requireValue(finding.suppressed === undefined || typeof finding.suppressed === 'boolean',
+    'finding.suppressed must be a boolean when present')
+  requireValue(
+    finding.suppressedIssueId === undefined || finding.suppressedIssueId === null
+      || nonEmpty(finding.suppressedIssueId),
+    'finding.suppressedIssueId must be a non-empty string or null',
+  )
+
+  // Optional: historical report-data.json predates anchors, and a finding whose source file
+  // was not in the copy is published without one. Present but malformed is still a hard error.
+  if (finding.anchor !== undefined && finding.anchor !== null) {
+    const a = finding.anchor
+    requireValue(a && typeof a === 'object', 'finding.anchor must be an object when present')
+    requireValue(a.version === 1, 'finding.anchor.version must be 1')
+    requireValue(['decl', 'file'].includes(a.anchorKind), 'finding.anchor.anchorKind is invalid: ' + a.anchorKind)
+    requireValue(nonEmpty(a.anchorName), 'finding.anchor.anchorName is required')
+    requireValue(/^[0-9a-f]{16}$/.test(a.codeHash), 'finding.anchor.codeHash must be 16 lowercase hex characters')
+    requireValue(/^fp1:[0-9a-f]{24}$/.test(a.fingerprint), 'finding.anchor.fingerprint must be fp1:<24 hex>')
+  }
+
   const { challengeVerdict, traceVerdict } = finding
   requireValue(
     ['DEFECT', 'NOT-A-DEFECT', 'UNSURE'].includes(challengeVerdict),
@@ -150,8 +170,11 @@ export function sortFindings(findings) {
 }
 
 export function summaryFor(findings) {
-  const counts = { confirmed: 0, refuted: 0, manualReview: 0 }
+  const counts = { confirmed: 0, refuted: 0, manualReview: 0, dismissed: 0 }
   for (const finding of findings) {
+    // A finding a human already dismissed is counted once, here, and nowhere else. Leaving it
+    // in the actionable buckets as well is what makes a board look like it never shrinks.
+    if (finding.suppressed) { counts.dismissed += 1; continue }
     const { bucket } = classifyFinding(finding)
     if (bucket === 'confirmed') counts.confirmed += 1
     else if (bucket === 'refuted') counts.refuted += 1

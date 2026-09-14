@@ -10,12 +10,15 @@ const book = readFileSync(join(root, 'skills/secaudit-orchestrator/SKILL.md'), '
 // ${CLAUDE_PLUGIN_ROOT} placeholder, so the file must state how to resolve the root itself.
 assert.match(book, /PLUGIN_ROOT/, 'runbook resolves a PLUGIN_ROOT value')
 assert.ok(!/node skills\//.test(book), 'no bare repo-relative `node skills/...` command survives')
-for (const script of ['secaudit-runtime.mjs', 'render-report.mjs', 'publish-artifacts.mjs', 'verify-artifacts.mjs']) {
+for (const script of ['secaudit-runtime.mjs', 'publish-artifacts.mjs', 'verify-artifacts.mjs']) {
   assert.ok(
     new RegExp(`<PLUGIN_ROOT>/skills/[^"\\s]*${script.replace('.', '\\.')}`).test(book),
     `${script} is invoked plugin-root relative`,
   )
 }
+// The rendered report is retired: the dashboard is the human view. Asserted gone so a
+// reintroduced renderer fails the suite rather than quietly coming back.
+assert.ok(!/render-report/.test(book), 'the runbook must not invoke a report renderer')
 
 // Codex adapter structure (spec: "Codex orchestrator structure and required stage
 // invariants"). The prose must state the same bounds the workflow enforces in code — an

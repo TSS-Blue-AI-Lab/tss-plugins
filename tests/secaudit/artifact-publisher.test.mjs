@@ -36,7 +36,7 @@ function makeRunDir({ withMarker = true } = {}) {
   const runDir = mkdtempSync(join(tmpdir(), 'secaudit-rundir-'))
   if (withMarker) {
     writeFileSync(join(runDir, 'secaudit-run.json'),
-      JSON.stringify({ marker: 'secaudit-run', formatVersion: 1, runId: 'test-run' }), 'utf8')
+      JSON.stringify({ marker: 'secaudit-run', formatVersion: 2, runId: 'test-run', state: 'prepared' }), 'utf8')
   }
   return runDir
 }
@@ -44,10 +44,16 @@ function makeRunDir({ withMarker = true } = {}) {
 function populateWork(work) {
   const sastDir = join(work, 'sast')
   mkdirSync(sastDir)
-  writeFileSync(join(sastDir, 'final-report.md'), '# Report\n', 'utf8')
-  writeFileSync(join(sastDir, 'final-report.html'), '<html></html>', 'utf8')
   writeFileSync(join(sastDir, 'report-data.json'), JSON.stringify(reportData), 'utf8')
   writeFileSync(join(sastDir, 'run-ledger.json'), JSON.stringify({ stage: 'report', status: 'complete' }), 'utf8')
+  // The copied source the findings point at. Anchors are computed against this tree at publish
+  // time, so a work tree without it exercises the wrong path.
+  mkdirSync(join(work, 'src'), { recursive: true })
+  for (const finding of reportData.findings) {
+    const lines = Array.from({ length: finding.line }, (_, i) => 'const filler' + i + ' = ' + i)
+    lines[finding.line - 1] = 'export function handler' + finding.line + '(req) { sink(req.q) }'
+    writeFileSync(join(work, ...finding.path.split('/')), lines.join('\n') + '\n', 'utf8')
+  }
   // Scratch left over from earlier stages; must be pruned on success, left alone on rejection.
   mkdirSync(join(work, 'scratch'))
   writeFileSync(join(work, 'scratch', 'debug.log'), 'debug', 'utf8')
@@ -59,6 +65,21 @@ function makeWork(runDir) {
   mkdirSync(work)
   populateWork(work)
   return work
+}
+
+// A complete, publishable run: pristine target, marked run directory, populated work tree.
+async function makeRun() {
+  const target = makeTarget()
+  const runDir = makeRunDir()
+  const work = makeWork(runDir)
+  return {
+    target, runDir, work,
+    // The publisher reads the marker's projectRoot, falling back to the run directory when a
+    // run records none — which is what these fixtures do.
+    projectRoot: runDir,
+    ledgerPath: join(work, 'sast', 'run-ledger.json'),
+    corpus: await corpusHash(target),
+  }
 }
 
 // --- Success path ---
@@ -73,10 +94,14 @@ function makeWork(runDir) {
     target, expectedCorpusSha256, work, runDir, ledgerPath,
   })
 
-  assert.deepStrictEqual(summary, { confirmed: 1, refuted: 2, manualReview: 2 })
-  assert.strictEqual(readFileSync(join(runDir, 'report.md'), 'utf8'), '# Report\n')
-  assert.strictEqual(readFileSync(join(runDir, 'report.html'), 'utf8'), '<html></html>')
+  assert.deepStrictEqual(
+    { confirmed: summary.confirmed, refuted: summary.refuted, manualReview: summary.manualReview },
+    { confirmed: 1, refuted: 2, manualReview: 2 })
+  // Provenance and structured findings, and nothing else.
   assert.ok(existsSync(join(runDir, 'trace.md')), 'trace.md must be written')
+  assert.ok(existsSync(join(work, 'sast', 'report-data.json')), 'report-data.json must survive the prune')
+  assert.ok(!existsSync(join(runDir, 'report.md')), 'no rendered markdown report')
+  assert.ok(!existsSync(join(runDir, 'report.html')), 'no rendered HTML report')
   const trace = readFileSync(join(runDir, 'trace.md'), 'utf8')
   assert.match(trace, /pristine/i)
   assert.match(trace, /"stage": "report"/, 'trace.md must include ledger contents')
@@ -88,7 +113,7 @@ assert.match(trace, /sourceFiles|Source files/i, 'trace.md must include coverage
   assert.deepStrictEqual(readdirSync(work), ['sast'], 'work must only contain sast after publish')
 
   // No .tmp siblings must remain.
-  for (const name of ['report.md.tmp', 'report.html.tmp', 'trace.md.tmp']) {
+  for (const name of ['trace.md.tmp']) {
     assert.ok(!existsSync(join(runDir, name)), name + ' must not remain')
   }
 }
@@ -109,7 +134,7 @@ assert.match(trace, /sourceFiles|Source files/i, 'trace.md must include coverage
     /corpus not pristine/,
   )
 
-  assert.deepStrictEqual(readdirSync(work).sort(), ['sast', 'scratch'], 'work must be untouched on rejection')
+  assert.deepStrictEqual(readdirSync(work).sort(), ['sast', 'scratch', 'src'], 'work must be untouched on rejection')
   assert.ok(!existsSync(join(runDir, 'report.md')), 'report.md must not be copied on rejection')
   assert.ok(!existsSync(join(runDir, 'report.html')), 'report.html must not be copied on rejection')
   assert.ok(!existsSync(join(runDir, 'trace.md')), 'trace.md must not be written on rejection')
@@ -124,7 +149,7 @@ assert.match(trace, /sourceFiles|Source files/i, 'trace.md must include coverage
     () => publishArtifacts({ target, expectedCorpusSha256: 'not-a-hash', work, runDir, ledgerPath: join(work, 'sast', 'run-ledger.json') }),
     /expectedCorpusSha256/,
   )
-  assert.deepStrictEqual(readdirSync(work).sort(), ['sast', 'scratch'], 'invalid input must not mutate work')
+  assert.deepStrictEqual(readdirSync(work).sort(), ['sast', 'scratch', 'src'], 'invalid input must not mutate work')
 }
 
 // --- CLI: flags map correctly and print one JSON summary line ---
@@ -142,8 +167,11 @@ assert.match(trace, /sourceFiles|Source files/i, 'trace.md must include coverage
     '--run-dir', runDir,
     '--ledger', ledgerPath,
   ]).toString('utf8').trim()
-  assert.deepStrictEqual(JSON.parse(output), { confirmed: 1, refuted: 2, manualReview: 2 })
-  assert.ok(existsSync(join(runDir, 'report.md')))
+  const cliResult = JSON.parse(output)
+  assert.deepStrictEqual(
+    { confirmed: cliResult.confirmed, refuted: cliResult.refuted, manualReview: cliResult.manualReview },
+    { confirmed: 1, refuted: 2, manualReview: 2 })
+  assert.ok(existsSync(join(runDir, 'trace.md')))
 }
 
 // --- Default-layout publish: runDir inside the target must not poison the pristine rehash ---
@@ -152,7 +180,7 @@ assert.match(trace, /sourceFiles|Source files/i, 'trace.md must include coverage
   const runDir = join(target, '.secaudit', 'runs', 'r1')
   mkdirSync(runDir, { recursive: true })
   writeFileSync(join(runDir, 'secaudit-run.json'),
-    JSON.stringify({ marker: 'secaudit-run', formatVersion: 1, runId: 'r1' }), 'utf8')
+    JSON.stringify({ marker: 'secaudit-run', formatVersion: 2, runId: 'r1', state: 'prepared' }), 'utf8')
   const work = makeWork(runDir)
   const ledgerPath = join(work, 'sast', 'run-ledger.json')
   const expectedCorpusSha256 = await corpusHash(target) // marker dir auto-skipped → hash of sources only
@@ -216,7 +244,7 @@ assert.match(trace, /sourceFiles|Source files/i, 'trace.md must include coverage
   assert.ok(!existsSync(join(runDir, 'report.md')), 'no report.md on a pruned-corpus abort')
   assert.ok(!existsSync(join(runDir, 'report.html')), 'no report.html on a pruned-corpus abort')
   assert.ok(!existsSync(join(runDir, 'trace.md')), 'no pristine claim on a pruned-corpus abort')
-  assert.deepStrictEqual(readdirSync(work).sort(), ['sast', 'scratch'],
+  assert.deepStrictEqual(readdirSync(work).sort(), ['sast', 'scratch', 'src'],
     'work must be untouched on a pruned-corpus abort')
 }
 
@@ -247,8 +275,130 @@ assert.match(trace, /sourceFiles|Source files/i, 'trace.md must include coverage
       /corpus not pristine/,
     )
     assert.ok(!existsSync(join(runDir, 'trace.md')), 'no pristine claim after symlink tampering')
-    assert.deepStrictEqual(readdirSync(work).sort(), ['sast', 'scratch'])
+    assert.deepStrictEqual(readdirSync(work).sort(), ['sast', 'scratch', 'src'])
   }
+}
+
+// --- lifecycle + cleanup accounting ----------------------------------------
+{
+  const fixture = await makeRun()
+  writeFileSync(join(fixture.work, 'leftover-source.py'), 'x = 1\n', 'utf8')
+
+  const summary = await publishArtifacts({
+    target: fixture.target,
+    expectedCorpusSha256: fixture.corpus,
+    work: fixture.work,
+    runDir: fixture.runDir,
+    ledgerPath: fixture.ledgerPath,
+  })
+
+  assert.equal(summary.state, 'complete')
+  assert.ok(summary.cleanup.ok)
+  assert.ok(summary.cleanup.removed.includes('leftover-source.py'))
+  assert.deepEqual(summary.cleanup.remaining, ['sast'])
+  assert.ok(!existsSync(join(fixture.work, 'leftover-source.py')))
+  assert.ok(existsSync(join(fixture.work, 'sast', 'report-data.json')))
+
+  const marker = JSON.parse(readFileSync(join(fixture.runDir, 'secaudit-run.json'), 'utf8'))
+  assert.equal(marker.state, 'complete')
+  assert.equal(typeof marker.publishedUtc, 'string')
+  assert.deepEqual(marker.artifacts, ['trace.md'])
+  assert.equal(marker.cleanup.ok, true)
+
+  console.log('artifact-publisher lifecycle: ok')
+}
+
+// --- a non-pristine corpus leaves the marker untouched ----------------------
+{
+  const fixture = await makeRun()
+  writeFileSync(join(fixture.target, 'app.py'), 'mutated = 1\n', 'utf8')
+
+  await assert.rejects(publishArtifacts({
+    target: fixture.target,
+    expectedCorpusSha256: fixture.corpus,
+    work: fixture.work,
+    runDir: fixture.runDir,
+    ledgerPath: fixture.ledgerPath,
+  }), /corpus not pristine/)
+
+  const marker = JSON.parse(readFileSync(join(fixture.runDir, 'secaudit-run.json'), 'utf8'))
+  assert.equal(marker.state, 'prepared')       // never advanced
+  assert.ok(!existsSync(join(fixture.runDir, 'trace.md')))
+
+  console.log('artifact-publisher aborts without advancing state: ok')
+}
+
+// --- anchors are persisted before the source copy is pruned ----------------
+{
+  const fixture = await makeRun()   // its work tree still holds the copied source
+  await publishArtifacts({
+    target: fixture.target,
+    expectedCorpusSha256: fixture.corpus,
+    work: fixture.work,
+    runDir: fixture.runDir,
+    ledgerPath: fixture.ledgerPath,
+  })
+
+  const published = JSON.parse(
+    readFileSync(join(fixture.work, 'sast', 'report-data.json'), 'utf8'))
+  for (const finding of published.findings) {
+    assert.equal(finding.anchor.version, 1)
+    assert.ok(finding.anchor.fingerprint.startsWith('fp1:'))
+    assert.equal(finding.anchor.codeHash.length, 16)
+  }
+  // The source copy is gone, but the anchors survived it.
+  assert.deepEqual(readdirSync(fixture.work), ['sast'])
+
+  console.log('artifact-publisher anchors: ok')
+}
+
+// --- a dismissed identity never reaches the actionable counts --------------
+{
+  const fixture = await makeRun()
+  // Suppress the first finding by the fingerprint the publisher is about to compute for it.
+  const { computeAnchor, fingerprintFor } =
+    await import(join(root, 'skills/issues/scripts/fingerprint.mjs'))
+  const { emptyStore, writeStore } =
+    await import(join(root, 'skills/issues/scripts/issue-store.mjs'))
+  const target = JSON.parse(
+    readFileSync(join(fixture.work, 'sast', 'report-data.json'), 'utf8')).findings[0]
+  const anchor = computeAnchor({
+    sourceText: readFileSync(join(fixture.work, ...target.path.split('/')), 'utf8'),
+    line: target.line,
+    path: target.path,
+  })
+  await writeStore(fixture.projectRoot, {
+    ...emptyStore(),
+    issues: [{
+      id: 'iss_suppressed', class: target.class, path: target.path, line: target.line,
+      title: target.title, severity: null, humanState: 'suppressed', ambiguous: false,
+      fingerprints: [fingerprintFor({ class: target.class, path: target.path, ...anchor })],
+      observations: [], evidence: {}, firstSeenRunId: 'old', lastSeenRunId: 'old',
+      lastHumanUtc: '2026-01-01T00:00:00Z', events: [],
+    }],
+  })
+
+  const summary = await publishArtifacts({
+    target: fixture.target,
+    expectedCorpusSha256: fixture.corpus,
+    work: fixture.work,
+    runDir: fixture.runDir,
+    ledgerPath: fixture.ledgerPath,
+  })
+
+  assert.equal(summary.dismissed, 1)
+  const published = JSON.parse(
+    readFileSync(join(fixture.work, 'sast', 'report-data.json'), 'utf8'))
+  const dismissed = published.findings.find(f => f.suppressed)
+  // Still in the record, with its original verdict — grouped away, not deleted or rewritten.
+  assert.ok(dismissed)
+  assert.equal(dismissed.suppressedIssueId, 'iss_suppressed')
+  assert.equal(dismissed.challengeVerdict, target.challengeVerdict)
+  // And it is not counted among the findings the operator is being asked to act on.
+  assert.equal(summary.confirmed + summary.refuted + summary.manualReview,
+    published.findings.length - 1)
+
+  console.log('artifact-publisher dismissal: ok')
 }
 
 console.log('PASS artifact-publisher')
