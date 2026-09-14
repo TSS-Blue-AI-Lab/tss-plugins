@@ -98,6 +98,11 @@ export function detailView(store, issueId) {
   }
 }
 
+// Newest first: the run someone wants is nearly always the last one. A run id begins with its
+// own UTC timestamp, so it is the one key every run has — an unimported run has no createdUtc,
+// and mixing the two formats would order them against each other, not by time.
+const byNewestFirst = (a, b) => (a.runId < b.runId ? 1 : a.runId > b.runId ? -1 : 0)
+
 export function runsView(store, discovered) {
   const byId = new Map(store.importedRuns.map(r => [r.runId, r]))
   return {
@@ -111,7 +116,7 @@ export function runsView(store, discovered) {
         observationCount: imported?.observationCount ?? 0,
         reason: d.reason ?? null,
       }
-    }),
+    }).sort(byNewestFirst),
   }
 }
 

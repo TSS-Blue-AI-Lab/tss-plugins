@@ -94,3 +94,25 @@ console.log('issues-view-model: ok')
   assert.equal(detail.facts.observations, 5)
   console.log('issues-view-model run ordering: ok')
 }
+
+// The runs list reads newest first: the run someone wants is nearly always the last one.
+{
+  const seen = ingestRun(emptyStore(), {
+    runId: '20260301T000000Z-cccccccc', runDir: '/x/c', createdUtc: '2026-03-01T00:00:00Z',
+    target: '/p', scope: [], status: 'ok', observations: [observation({ runId: '20260301T000000Z-cccccccc' })],
+  }).store
+  const listed = runsView(seen, [
+    { runId: '20260101T000000Z-aaaaaaaa', runDir: '/x/a' },
+    { runId: '20260301T000000Z-cccccccc', runDir: '/x/c' },
+    { runId: '20260201T000000Z-bbbbbbbb', runDir: '/x/b', status: 'unavailable', reason: 'no report-data.json' },
+  ]).runs
+  assert.deepEqual(listed.map(r => r.runId), [
+    '20260301T000000Z-cccccccc',
+    '20260201T000000Z-bbbbbbbb',
+    '20260101T000000Z-aaaaaaaa',
+  ])
+  // A run that was never imported has no createdUtc and still sorts correctly: the order comes
+  // from the run id, which begins with its own UTC timestamp.
+  assert.equal(listed[1].createdUtc, null)
+  console.log('issues-view-model run listing: ok')
+}
