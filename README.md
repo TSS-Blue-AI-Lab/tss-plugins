@@ -48,7 +48,10 @@ for t in tests/*/*.test.mjs; do node "$t"; done
 ```
 
 Releases: bump `version` in the plugin's `.claude-plugin/plugin.json` AND
-`.codex-plugin/plugin.json` (must match), commit conventionally (`feat(<plugin>): v0.2.0`).
+`.codex-plugin/plugin.json` (must match), commit conventionally (`feat(<plugin>): v0.2.0`). Tag
+per plugin as `<plugin>-v<version>`, matching the version in its manifests — plugins here are
+installed and versioned one at a time, so a repository-wide tag would claim a number no
+manifest holds.
 
 A plugin that ships a `hooks/` directory must declare `"hooks": {}` in its
 `.codex-plugin/plugin.json`. Codex auto-discovers `hooks/hooks.json` when the field is absent
