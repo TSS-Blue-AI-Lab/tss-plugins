@@ -23,6 +23,22 @@ const SECTIONS = [
   { key: 'dynamicTest', label: 'Dynamic test', from: o => o.dynamicTest },
 ]
 
+// A run's record is read by a human deciding what to look at first, so it leads with the worst
+// thing the run found. Severity order is the report contract's own (Critical, High, Medium,
+// Low); a finding with no severity — refuted, or awaiting a defect determination — sorts last
+// because the audit did not rate it, not because it is harmless. Path and line break ties so
+// the order is stable between reads.
+const SEVERITY_RANK = new Map([['Critical', 0], ['High', 1], ['Medium', 2], ['Low', 3]])
+const severityRank = card => SEVERITY_RANK.get(card.severity) ?? 99
+
+function bySeverity(a, b) {
+  const rank = severityRank(a) - severityRank(b)
+  if (rank !== 0) return rank
+  const path = a.path.toLowerCase().localeCompare(b.path.toLowerCase())
+  if (path !== 0) return path
+  return (a.line ?? 0) - (b.line ?? 0)
+}
+
 function latestObservationRecord(issue) {
   const last = issue.observations[issue.observations.length - 1]
   return { ...last, ...(issue.evidence?.[last.observationId] ?? {}) }
@@ -120,6 +136,6 @@ export function runDetailView(store, runId) {
       checksRun: imported.checksRun ?? null,
       observations,
     },
-    cards,
+    cards: cards.sort(bySeverity),
   }
 }

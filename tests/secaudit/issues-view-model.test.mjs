@@ -5,7 +5,8 @@ import assert from 'node:assert'
 const scripts = join(dirname(fileURLToPath(import.meta.url)), '..', '..',
   'plugins', 'secaudit', 'skills', 'issues', 'scripts')
 const { emptyStore, ingestRun, applyTransition } = await import(join(scripts, 'issue-store.mjs'))
-const { boardView, archiveView, detailView, runsView } = await import(join(scripts, 'view-model.mjs'))
+const { boardView, archiveView, detailView, runsView, runDetailView } =
+  await import(join(scripts, 'view-model.mjs'))
 
 const observation = (over = {}) => ({
   observationId: 'o1', runId: 'r1', class: 'sqli', path: 'a.py', line: 4,
@@ -68,3 +69,28 @@ assert.equal(runs.runs.find(r => r.runId === 'r2').status, 'unavailable')
 assert.match(runs.runs.find(r => r.runId === 'r2').reason, /report-data/)
 
 console.log('issues-view-model: ok')
+
+// A run's record leads with the worst thing that run found. Unrated findings — refuted, or
+// awaiting a defect determination — sort last: the audit did not rate them, which is not the
+// same as rating them harmless.
+{
+  const at = (over) => observation({ ...over, fingerprint: 'fp1:' + over.observationId.padEnd(24, '0') })
+  const runStore = ingestRun(emptyStore(), {
+    runId: 'r5', runDir: '/x/r5', createdUtc: '2026-01-01T00:00:00Z', target: '/p', scope: [],
+    status: 'ok',
+    observations: [
+      at({ observationId: 'med', runId: 'r5', severity: 'Medium', path: 'm.py', line: 1 }),
+      at({ observationId: 'none', runId: 'r5', severity: null, path: 'n.py', line: 1,
+        challengeVerdict: 'UNSURE', traceVerdict: null }),
+      at({ observationId: 'crit', runId: 'r5', severity: 'Critical', path: 'c.py', line: 1 }),
+      at({ observationId: 'high2', runId: 'r5', severity: 'High', path: 'b.py', line: 9 }),
+      at({ observationId: 'high1', runId: 'r5', severity: 'High', path: 'b.py', line: 2 }),
+    ],
+  }).store
+  const detail = runDetailView(runStore, 'r5')
+  assert.deepEqual(detail.cards.map(c => c.severity), ['Critical', 'High', 'High', 'Medium', null])
+  // Ties break on path then line, so two reads of the same run never disagree.
+  assert.deepEqual(detail.cards.filter(c => c.severity === 'High').map(c => c.line), [2, 9])
+  assert.equal(detail.facts.observations, 5)
+  console.log('issues-view-model run ordering: ok')
+}
