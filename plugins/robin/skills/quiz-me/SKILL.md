@@ -1,7 +1,7 @@
 ---
 name: quiz-me
 description: Explain a finished change and quiz the user on it until they can prove they understand it. Use when the user says "quiz me", "quiz me on this change", or wants to verify they understand what happened in a session before merging. Also use after a branch review passes.
-version: 1.2.0
+version: 1.3.0
 ---
 
 # Quiz Me
@@ -76,10 +76,12 @@ Structure the report however this particular change is best explained — the sh
 
 - Behaviour before implementation. What the change *does*, in plain language, before any file name appears.
 - The reasoning behind each real decision, with the alternative that was rejected. Every decision and deviation recorded in the implementation notes, a plan, or a spec earns a place here — that material is the whole reason a diff is not enough.
-- One end-to-end walk of a real request, naming each hop with `file:line` and marking which hops are **unchanged code**. Those hops are the intuition the diff cannot give.
+- One end-to-end walk of a real request, drawn as a sequence diagram, with each hop's `file:line` and which hops are **unchanged code** listed in that section's evidence block. Those hops are the intuition the diff cannot give.
 - The behaviour a reasonable person would guess wrong, from Phase 2, each paired with the false assumption it breaks.
 - What was left undone or deliberately simplified, including anything a review flagged and the user accepted.
-- Evidence on every claim. `[INFERRED]` where it is reasoning, `[ASK A HUMAN]` where it could not be determined.
+- Evidence on every claim, kept in a collapsible "Where in the code" block under each section rather than inline. `[INFERRED]` where it is reasoning, `[ASK A HUMAN]` where it could not be determined.
+
+**Style is not optional.** Plain language first, a diagram, chart or card grid opening every section, and real numbers plotted wherever the change has any. Read `references/report-style.md` before writing a line of the page — a dense, citation-heavy audit is a failed report even when every claim is right.
 
 Read `references/question-design.md` for question rules, distractor rules, grading, and the page mechanics the quiz depends on.
 
