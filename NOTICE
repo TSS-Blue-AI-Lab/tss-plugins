@@ -7,5 +7,6 @@ copy — an install contains only `plugins/<name>/`, never this repository root.
 
 - secaudit — derived in part from sast-skills (MIT, (c) 2026 Utku Sen):
   see plugins/secaudit/NOTICE
-- robin — bundles hooks/run-hook.cmd from superpowers (MIT, (c) 2025 Jesse Vincent):
-  see plugins/robin/NOTICE
+- robin — bundles hooks/run-hook.cmd from superpowers (MIT, (c) 2025 Jesse Vincent), the
+  grilling and retro skills from mattpocock/skills (MIT, (c) 2026 Matt Pocock), and the
+  html-plan skill by Thariq Shihipar (MIT): see plugins/robin/NOTICE

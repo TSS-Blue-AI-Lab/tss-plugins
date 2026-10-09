@@ -12,11 +12,84 @@ Copied from superpowers
 hooks/run-hook.cmd — the polyglot cmd/bash wrapper that lets one extensionless hook script run
 on both Windows and Unix — is copied from superpowers (https://github.com/obra/superpowers)
 with an attribution comment added and no change in behaviour. Nothing else in this plugin
-derives from that work.
+derives from that work; the sections below cover the rest of the third-party content.
 
 MIT License
 
 Copyright (c) 2025 Jesse Vincent
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+
+Copied from mattpocock/skills
+-----------------------------
+
+Taken from https://github.com/mattpocock/skills at commit
+b0618bc436ad893b3c5e84e55fba86586d34a404:
+
+- skills/grilling/SKILL.md — copied unchanged from skills/productivity/grilling/SKILL.md.
+- skills/retro/agents/openai.yaml — copied unchanged from skills/engineering/retro/.
+- skills/retro/SKILL.md — rewritten from skills/engineering/retro/SKILL.md and its documentation
+  page docs/engineering/retro.md so it stands alone: it reads the reference files below instead
+  of loading a separate writing-for-agents skill, and finds the repository's own review setup
+  instead of assuming a CODING_STANDARDS.md and a code-review skill.
+- skills/retro/references/writing-for-agents.md and skills/retro/references/skill-mechanics.md
+  — the writing-for-agents skill (skills/productivity/writing-for-agents/SKILL.md, without its
+  frontmatter, and SKILL-MECHANICS.md), merged into retro as reference files. Modified only to
+  update the links between the files.
+
+MIT License
+
+Copyright (c) 2026 Matt Pocock
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+
+Copied from html-plan
+---------------------
+
+skills/html-plan/ — SKILL.md, references/blocks.md, runtime/ (htmlplan.css, htmlplan.js,
+pack.mjs) and examples/scheduled-send.html — is copied from the html-plan plugin by Thariq
+Shihipar, version 1.0.0, as published in https://github.com/anthropics/claude-plugins-community
+at commit f60f0454df3045f724c43c6346ec80bdcc3472b2. It is modified for text contrast: colour
+tokens and a few rules in runtime/htmlplan.css, the mock base styles in runtime/htmlplan.js,
+one muted colour in the example, and a note in references/blocks.md on frame="none" mocks. The plugin's manifest declares the MIT License and
+ships no separate license file or copyright line; the MIT terms are reproduced below. The
+claude-plugins-community repository as a whole is licensed under the Apache License 2.0.
+
+MIT License
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

@@ -17,6 +17,8 @@ Recommends only. Never invoke the skill you point at, never chain into it, and n
 | `blindspot-pass` | The user doesn't know the territory — an unfamiliar area of the codebase, or an unfamiliar subject. Ends at a ranked report of unknown unknowns. |
 | `strawman` | The user can't say what they want but will recognise it. Builds throwaway options and mockups to react to. Ends at a spec. |
 | `interview-me` | The user has a plan with holes. Questions one at a time, ranked by blast radius. Ends at a decision record. |
+| `grilling` | Same holes, but the user wants it fast. Asks every question that is answerable now in one round, each with a recommended answer. Ends when nothing is left assumed. |
+| `html-plan` | The user wants to review a plan before anything is built. Writes it as one interactive HTML page with the decisions placed where they matter. Ends when the user pastes back their response. |
 
 ## During implementation
 
@@ -29,6 +31,7 @@ On a harness with no hook system nothing is injected and the notes file is the u
 | Skill | Use when |
 |-------|----------|
 | `quiz-me` | The change is finished and the user isn't sure they understand it. Explains it, then quizzes them until they can prove it. Ends at an HTML report plus a must-pass quiz. |
+| `retro` | The session was harder than it should have been. Proposes fixes to the agent's environment (checks, pointers, standards) so the next run goes better. Ends at a ranked list of candidates. User-invoked only. |
 
 ## Routing
 
@@ -36,10 +39,12 @@ Match what the user is actually stuck on:
 
 - *"I don't know this area"* → `blindspot-pass`
 - *"I'll know it when I see it"* → `strawman`
-- *"my plan still has holes"* → `interview-me`
+- *"my plan still has holes"* → `interview-me`, or `grilling` for rounds instead of one at a time
+- *"show me the plan before you build"* → `html-plan`
 - *"I don't really know what just got built"* → `quiz-me`
+- *"that session was painful, so stop it happening again"* → `retro`
 
-Starting cold, the natural order is blindspot-pass, then strawman, then interview-me — but that is an observation, not a pipeline. Most sessions need exactly one.
+Starting cold, the natural order is blindspot-pass, then strawman, then interview-me or grilling, then html-plan — but that is an observation, not a pipeline. Most sessions need exactly one.
 
 If none of them fit, say so plainly. A wrong recommendation costs more than no recommendation.
 
