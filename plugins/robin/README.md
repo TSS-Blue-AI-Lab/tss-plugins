@@ -10,7 +10,8 @@ implementation-notes hook is Claude Code only — Codex has no hook system — a
 works identically in both.
 
 Not affiliated with the superpowers project; the cross-platform hook wrapper is copied from it
-(MIT, © 2025 Jesse Vincent — see [NOTICE](NOTICE)).
+(MIT, © 2025 Jesse Vincent — see [NOTICE](NOTICE)). `grilling` and `retro` come from Matt Pocock's
+skills (MIT), and `html-plan` from Thariq Shihipar's plugin (MIT); NOTICE has the details.
 
 ## Skills
 
@@ -22,6 +23,11 @@ Not affiliated with the superpowers project; the cross-platform hook wrapper is 
   recognise but not state. Ends at a spec.
 - **`interview-me`** — resolves remaining ambiguity one question at a time, ranked by blast
   radius. Ends at a decision record.
+- **`grilling`** — the same job in rounds: every question answerable now, at once, each with a
+  recommended answer. Fires on "grill me". Ends when nothing is left assumed.
+- **`html-plan`** — writes the implementation plan as one interactive HTML page: a tree of
+  claims, each proved by a mockup, state machine, call stack, schema or code, with your
+  decisions placed where they matter. Ends when you paste back its response.
 
 ### During implementation
 
@@ -42,6 +48,9 @@ Not affiliated with the superpowers project; the cross-platform hook wrapper is 
 
 - **`quiz-me`** — explains a finished change with the context a diff can't give, then quizzes you
   on it. Ends at a self-contained HTML report with a must-pass quiz.
+- **`retro`** — reviews a hard session and proposes fixes to the agent's environment: automated
+  checks, navigation pointers, coding standards. Proposes only; nothing changes until you pick a
+  candidate. User-invoked only: `/robin:retro`.
 
 Not sure which one? Run `/robin:map` (Codex: `$robin:map`).
 
@@ -75,8 +84,10 @@ No CLI needed — the app has a UI for this:
 
 ## Requirements
 
-- Claude Code, or Codex. Nothing else: the skills are prose and the hook is pure bash with no
-  dependencies and no install step.
+- Claude Code, or Codex. The skills are prose and the hook is pure bash with no dependencies and
+  no install step.
+- `node`, for `html-plan` only: its `runtime/pack.mjs` lints the plan and packs it into one
+  offline HTML file. No npm install. Every other skill runs without it.
 - The hook uses `git` to key its once-per-branch marker; outside a repository it falls back to a
   branch of `nobranch`. On Windows, Claude Code runs it through `hooks/run-hook.cmd`, which
   locates Git Bash — with no bash anywhere the wrapper exits silently and the plugin keeps
@@ -99,7 +110,7 @@ and each degrades explicitly rather than silently:
 What ships when you install the plugin:
 
 - `skills/` — the canonical skill tree both clients read: `blindspot-pass`, `strawman`,
-  `interview-me`, `quiz-me`, `map`
+  `interview-me`, `grilling`, `html-plan`, `quiz-me`, `retro`, `map`
 - `hooks/` — `hooks.json`, the `notes-rule` script, and the `run-hook.cmd` polyglot wrapper
   (Claude Code only; inert under Codex)
 - `.claude-plugin/plugin.json`, `.codex-plugin/plugin.json` — per-client plugin manifests

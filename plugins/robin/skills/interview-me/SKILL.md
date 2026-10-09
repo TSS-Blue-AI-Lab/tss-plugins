@@ -1,6 +1,6 @@
 ---
 name: interview-me
-description: Interview the user one question at a time to resolve ambiguities in a plan or design, ranked by blast radius. Use when the user says "interview me", "grill me", or asks what is still ambiguous.
+description: Interview the user one question at a time to resolve ambiguities in a plan or design, ranked by blast radius. Use when the user says "interview me", or asks what is still ambiguous.
 version: 1.0.0
 ---
 
