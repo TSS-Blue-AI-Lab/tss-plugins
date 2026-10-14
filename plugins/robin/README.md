@@ -25,6 +25,9 @@ skills (MIT), and `html-plan` from Thariq Shihipar's plugin (MIT); NOTICE has th
   radius. Ends at a decision record.
 - **`grilling`** — the same job in rounds: every question answerable now, at once, each with a
   recommended answer. Fires on "grill me". Ends when nothing is left assumed.
+- **`spec-explainer`** — explains a written design spec as one HTML page: a figure per decision
+  (diagram, plot, worked example or table) with the conclusion it supports. Never edits the spec.
+  Ends at the page plus any discrepancies between the spec and its sources.
 - **`html-plan`** — writes the implementation plan as one interactive HTML page: a tree of
   claims, each proved by a mockup, state machine, call stack, schema or code, with your
   decisions placed where they matter. Ends when you paste back its response.
@@ -110,7 +113,7 @@ and each degrades explicitly rather than silently:
 What ships when you install the plugin:
 
 - `skills/` — the canonical skill tree both clients read: `blindspot-pass`, `strawman`,
-  `interview-me`, `grilling`, `html-plan`, `quiz-me`, `retro`, `map`
+  `interview-me`, `grilling`, `spec-explainer`, `html-plan`, `quiz-me`, `retro`, `map`
 - `hooks/` — `hooks.json`, the `notes-rule` script, and the `run-hook.cmd` polyglot wrapper
   (Claude Code only; inert under Codex)
 - `.claude-plugin/plugin.json`, `.codex-plugin/plugin.json` — per-client plugin manifests
