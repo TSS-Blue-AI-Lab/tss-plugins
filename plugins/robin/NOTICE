@@ -43,7 +43,9 @@ Copied from mattpocock/skills
 Taken from https://github.com/mattpocock/skills at commit
 b0618bc436ad893b3c5e84e55fba86586d34a404:
 
-- skills/grilling/SKILL.md — copied unchanged from skills/productivity/grilling/SKILL.md.
+- skills/grilling/SKILL.md — copied from skills/productivity/grilling/SKILL.md. Modified to ask
+  each round through the harness's question tool when it has one, and to say what each
+  recommended answer rests on.
 - skills/retro/agents/openai.yaml — copied unchanged from skills/engineering/retro/.
 - skills/retro/SKILL.md — rewritten from skills/engineering/retro/SKILL.md and its documentation
   page docs/engineering/retro.md so it stands alone: it reads the reference files below instead
