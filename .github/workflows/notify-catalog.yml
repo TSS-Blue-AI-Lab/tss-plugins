@@ -1,0 +1,39 @@
+name: notify catalog
+
+# Fires on every push to main that changes a plugin or the marketplace index.
+# Dispatches `skills-updated` to TSS-Blue-AI-Lab/tss-agent-skills, whose
+# refresh-catalog workflow rebuilds the skills.totalspecificsolutions.ai
+# catalog from this repo's main. Without it the site keeps the last manual
+# refresh. Mirrors notify-monorepo.yml in ai-lab-agent-skills.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'plugins/**'
+      - '.claude-plugin/marketplace.json'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: notify-catalog
+  cancel-in-progress: false
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: dispatch skills-updated to tss-agent-skills
+        env:
+          GH_TOKEN: ${{ secrets.MONOREPO_DISPATCH_TOKEN }}
+          SHA: ${{ github.sha }}
+        run: |
+          # Fail loudly: a silent skip is how the catalog went stale before.
+          if [ -z "$GH_TOKEN" ]; then
+            echo "MONOREPO_DISPATCH_TOKEN secret is not set on this repo" >&2
+            exit 1
+          fi
+          gh api repos/TSS-Blue-AI-Lab/tss-agent-skills/dispatches \
+            --method POST \
+            -f event_type=skills-updated \
+            -f client_payload[sha]="$SHA"
