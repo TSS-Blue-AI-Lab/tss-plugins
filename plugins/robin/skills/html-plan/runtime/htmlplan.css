@@ -40,7 +40,7 @@
 
 * { box-sizing: border-box; }
 html { overflow-x: hidden; background: var(--paper); color: var(--ink); font: 430 16px/1.6 var(--sans); -webkit-text-size-adjust: 100%; scroll-padding-top: 16px; }
-body { margin: 0; padding: 40px 20px 120px; overflow-x: hidden; overflow-x: clip; }   /* clip, so sticky rows still use the viewport */
+body { margin: 0; padding: 40px 20px 120px; overflow-x: hidden; overflow-x: clip; background: var(--paper); color: var(--ink); }   /* clip, so sticky rows still use the viewport. Paint body too: an artifact host wraps the page in its own <body>, which can be white */
 body > header, body > main, body > footer, body > section, body > article { max-width: var(--col); margin: 0 auto; }
 @media (min-width: 1180px) { body.has-toc { padding-left: 260px; } }
 
