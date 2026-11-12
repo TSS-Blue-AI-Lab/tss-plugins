@@ -31,6 +31,13 @@ skills (MIT), and `html-plan` from Thariq Shihipar's plugin (MIT); NOTICE has th
 - **`html-plan`** — writes the implementation plan as one interactive HTML page: a tree of
   claims, each proved by a mockup, state machine, call stack, schema or code, with your
   decisions placed where they matter. Ends when you paste back its response.
+- **`cold-read`** — fresh reviewers with no context read a spec or plan and challenge it: a
+  paraphrase, an opponent, and a check against the repository. Each finding is fixed, contested
+  with evidence, or declined; anything that needs your call is decided with the recommended
+  option and marked in the document under `## Open decisions`. It asks nothing until it ends,
+  then lists those decisions for you to answer once, so it fits before `html-plan` or any other
+  review. Complements superpowers' builder check, which asks what is missing; this asks what is
+  wrong. One full read, then a scoped re-read of the edits until they hold, capped at two.
 
 ### During implementation
 
@@ -106,14 +113,16 @@ and each degrades explicitly rather than silently:
   and marks every domain finding `[ASK A HUMAN]` instead of answering from model memory.
 - **Parallel subagents** — `blindspot-pass` and `quiz-me` fan out read-only researchers. Codex
   needs `[features] multi_agent = true` in `~/.codex/config.toml`. Without it the angles run
-  sequentially in one session and the report says so.
+  sequentially in one session and the report says so. `cold-read` needs them outright: a review
+  in the session that wrote the document is not cold, so without subagents it says so and stops.
 
 ## Layout
 
 What ships when you install the plugin:
 
 - `skills/` — the canonical skill tree both clients read: `blindspot-pass`, `strawman`,
-  `interview-me`, `grilling`, `spec-explainer`, `html-plan`, `quiz-me`, `retro`, `map`
+  `interview-me`, `grilling`, `spec-explainer`, `html-plan`, `cold-read`, `quiz-me`, `retro`,
+  `map`
 - `hooks/` — `hooks.json`, the `notes-rule` script, and the `run-hook.cmd` polyglot wrapper
   (Claude Code only; inert under Codex)
 - `.claude-plugin/plugin.json`, `.codex-plugin/plugin.json` — per-client plugin manifests
