@@ -20,7 +20,7 @@ Recommends only. Never invoke the skill you point at, never chain into it, and n
 | `grilling` | Same holes, but the user wants it fast. Asks every question that is answerable now in one round, each with a recommended answer. Ends when nothing is left assumed. |
 | `spec-explainer` | The spec is written and someone (the user, a PM, a reviewer) needs to understand it. Explains it as one HTML page of figures and short technical prose. Ends at the page plus any discrepancies between the spec and its sources. |
 | `html-plan` | The user wants to review a plan before anything is built. Writes it as one interactive HTML page with the decisions placed where they matter. Ends when the user pastes back their response. |
-| `cold-read` | A spec or plan is written and the user wants fresh agents to challenge it before building. Reviewers read it with no context; each finding is fixed, contested, declined or put to the user. Ends when a re-read of its edits comes back clean. |
+| `cold-read` | A spec or plan is written and the user wants fresh agents to challenge it before building. Reviewers read it with no context; the agent fixes, contests or declines each finding, and decides the rest itself, marking each decision in the document. Asks nothing until the end. Ends with a list of open decisions the user answers once. |
 
 ## During implementation
 

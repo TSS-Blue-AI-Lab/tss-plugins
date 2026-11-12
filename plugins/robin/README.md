@@ -33,9 +33,11 @@ skills (MIT), and `html-plan` from Thariq Shihipar's plugin (MIT); NOTICE has th
   decisions placed where they matter. Ends when you paste back its response.
 - **`cold-read`** — fresh reviewers with no context read a spec or plan and challenge it: a
   paraphrase, an opponent, and a check against the repository. Each finding is fixed, contested
-  with evidence, declined, or put to you. Complements superpowers' builder check, which asks
-  what is missing; this asks what is wrong. One full read, then a scoped re-read of the edits
-  until they hold, capped at two.
+  with evidence, or declined; anything that needs your call is decided with the recommended
+  option and marked in the document under `## Open decisions`. It asks nothing until it ends,
+  then lists those decisions for you to answer once, so it fits before `html-plan` or any other
+  review. Complements superpowers' builder check, which asks what is missing; this asks what is
+  wrong. One full read, then a scoped re-read of the edits until they hold, capped at two.
 
 ### During implementation
 
